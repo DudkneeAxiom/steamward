@@ -1,0 +1,245 @@
+/* STEAMWARD UI — stamped metal, map-table markings, restrained parchment */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink: #d8d2c4;
+  --ink-dim: #9a937f;
+  --panel: rgba(30, 28, 24, 0.92);
+  --panel-edge: #4d463a;
+  --brass: #c9a959;
+  --brass-dim: #8a7440;
+  --parch: #e8dcc0;
+  --danger: #b5533c;
+  --ok: #7ba05b;
+  --player: #4e8a5c;
+  --falkmoor: #a03a2c;
+  --brennan: #4a6f96;
+}
+
+html, body { width: 100%; height: 100%; overflow: hidden; background: #171512; }
+body {
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app { position: relative; width: 100vw; height: 100vh; }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+
+.hidden { display: none !important; }
+
+/* ---------- top bar ---------- */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 42px;
+  display: flex; align-items: center; gap: 14px; padding: 0 12px;
+  background: linear-gradient(180deg, rgba(24,22,19,.97), rgba(24,22,19,.88));
+  border-bottom: 1px solid var(--panel-edge);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  z-index: 20;
+}
+#topbar .brand {
+  font-weight: 700; letter-spacing: 3px; font-size: 13px; color: var(--brass);
+  border-right: 1px solid var(--panel-edge); padding-right: 14px;
+}
+.res { display: flex; align-items: center; gap: 6px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.res-ico { width: 13px; height: 13px; border-radius: 2px; display: inline-block; }
+.ico-crowns { background: radial-gradient(circle at 35% 35%, #e8c96a, #8a6d2a); border-radius: 50%; }
+.ico-provisions { background: linear-gradient(135deg, #b08d57, #6e5836); }
+.ico-coal { background: linear-gradient(135deg, #3d3d42, #1a1a1e); border: 1px solid #555; }
+.res-val { min-width: 34px; }
+.res-delta { color: var(--ok); font-size: 11px; }
+.spacer { flex: 1; }
+#objective-chip {
+  font-size: 11px; letter-spacing: 1px; color: var(--ink-dim);
+  border: 1px solid var(--panel-edge); border-radius: 3px; padding: 4px 10px;
+  background: rgba(0,0,0,.25); white-space: nowrap;
+}
+#objective-chip b { color: var(--brass); }
+.tbtn {
+  background: #2a2721; color: var(--ink); border: 1px solid var(--panel-edge);
+  width: 30px; height: 26px; border-radius: 3px; cursor: pointer; font-size: 11px;
+}
+.tbtn:hover { border-color: var(--brass-dim); color: var(--brass); }
+.tbtn.active { border-color: var(--brass); color: var(--brass); background: #332f27; }
+
+/* ---------- alerts ---------- */
+#alerts {
+  position: absolute; top: 50px; right: 10px; width: 280px; z-index: 18;
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.alert {
+  background: var(--panel); border: 1px solid var(--panel-edge); border-left: 3px solid var(--brass);
+  padding: 7px 10px; font-size: 12px; letter-spacing: .5px;
+  animation: alert-in .25s ease-out; pointer-events: auto; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.alert.threat { border-left-color: var(--danger); }
+.alert.good { border-left-color: var(--ok); }
+.alert .sub { color: var(--ink-dim); font-size: 11px; margin-top: 2px; }
+.alert.fading { opacity: 0; transition: opacity .6s; }
+@keyframes alert-in { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- context panel ---------- */
+#context-panel {
+  position: absolute; left: 10px; bottom: 10px; width: 300px; z-index: 15;
+  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px;
+  padding: 10px 12px; font-size: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.5);
+}
+#context-panel h3 {
+  font-size: 13px; letter-spacing: 2px; color: var(--brass); margin-bottom: 2px;
+  display: flex; align-items: center; gap: 8px;
+}
+#context-panel .owner-strip { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+#context-panel .subtitle { color: var(--ink-dim); font-size: 11px; margin-bottom: 6px; }
+#context-panel .row { margin: 3px 0; display: flex; justify-content: space-between; }
+#context-panel .row .k { color: var(--ink-dim); }
+#context-panel .troops { margin: 6px 0; line-height: 1.5; }
+#context-panel button {
+  background: #2e2a23; border: 1px solid var(--panel-edge); color: var(--ink);
+  padding: 5px 9px; margin: 3px 4px 0 0; border-radius: 3px; cursor: pointer; font-size: 11px;
+  letter-spacing: .5px;
+}
+#context-panel button:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
+#context-panel button:disabled { opacity: .4; cursor: default; }
+#context-panel .hint { color: var(--ink-dim); font-size: 10px; margin-top: 6px; font-style: italic; }
+
+/* ---------- battle HUD ---------- */
+#battle-hud {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 10px; pointer-events: none;
+}
+#battle-forces {
+  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px;
+  padding: 8px 12px; font-size: 12px; pointer-events: auto; min-width: 170px;
+}
+#battle-forces .frow { display: flex; justify-content: space-between; gap: 16px; margin: 2px 0; }
+#battle-forces .fname { letter-spacing: 1px; }
+#battle-selinfo {
+  background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 3px;
+  padding: 8px 12px; font-size: 11px; pointer-events: auto; max-width: 440px; min-height: 34px;
+  line-height: 1.5;
+}
+#battle-buttons { display: flex; gap: 6px; pointer-events: auto; }
+.fbtn {
+  background: #2a2721; color: var(--ink); border: 1px solid var(--panel-edge);
+  padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 11px; letter-spacing: 1px;
+}
+.fbtn:hover { border-color: var(--brass); color: var(--brass); }
+.fbtn.active { border-color: var(--brass); color: var(--brass); }
+.fbtn.warn:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ---------- dialogs ---------- */
+#dialog-root {
+  position: absolute; inset: 0; z-index: 30;
+  background: rgba(10, 9, 8, 0.55);
+  display: flex; align-items: center; justify-content: center;
+}
+.dialog {
+  background: #211e19; border: 1px solid var(--brass-dim); border-radius: 4px;
+  min-width: 380px; max-width: 560px; max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,.7);
+  padding: 18px 22px;
+}
+.dialog h2 {
+  font-size: 16px; letter-spacing: 3px; color: var(--brass); margin-bottom: 4px;
+  border-bottom: 1px solid var(--panel-edge); padding-bottom: 8px;
+}
+.dialog h2.threat { color: var(--danger); }
+.dialog .dsub { color: var(--ink-dim); font-size: 12px; margin: 8px 0; }
+.dialog .vs {
+  display: flex; justify-content: space-around; align-items: center; margin: 14px 0;
+  font-size: 13px; text-align: center;
+}
+.dialog .vs .num { font-size: 26px; font-weight: 700; color: var(--parch); }
+.dialog .vs .lbl { font-size: 10px; letter-spacing: 2px; color: var(--ink-dim); }
+.dialog .vs .mid { font-size: 12px; color: var(--brass-dim); letter-spacing: 2px; }
+.dialog .stat-table { width: 100%; font-size: 12px; border-collapse: collapse; margin: 8px 0; }
+.dialog .stat-table td { padding: 3px 6px; border-bottom: 1px solid #2e2b25; }
+.dialog .stat-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.dialog .stat-table .good { color: var(--ok); }
+.dialog .stat-table .bad { color: var(--danger); }
+.dialog .btnrow { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.dialog button {
+  flex: 1; background: #2e2a23; border: 1px solid var(--panel-edge); color: var(--ink);
+  padding: 9px 12px; border-radius: 3px; cursor: pointer; font-size: 12px; letter-spacing: 1.5px;
+  min-width: 100px;
+}
+.dialog button:hover:not(:disabled) { border-color: var(--brass); color: var(--brass); }
+.dialog button:disabled { opacity: .4; cursor: default; }
+.dialog button.primary { border-color: var(--brass-dim); color: var(--brass); }
+.dialog button.danger:hover { border-color: var(--danger); color: var(--danger); }
+.dialog .notable {
+  border: 1px solid var(--panel-edge); border-left: 3px solid var(--brass);
+  background: rgba(0,0,0,.25); padding: 8px 10px; margin: 8px 0; font-size: 12px;
+}
+.dialog .notable .nname { color: var(--parch); font-weight: 600; }
+.dialog .notable .nsub { color: var(--ink-dim); font-size: 11px; }
+.dialog .promo-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border-bottom: 1px solid #2e2b25; padding: 6px 0; font-size: 12px;
+}
+.dialog .promo-row .pname { color: var(--parch); }
+.dialog .promo-row .psub { color: var(--ink-dim); font-size: 11px; }
+.dialog .promo-row button { flex: 0 0 auto; padding: 5px 10px; min-width: 0; font-size: 10px; }
+
+/* ---------- main menu ---------- */
+#mainmenu {
+  position: absolute; inset: 0; z-index: 40;
+  background: radial-gradient(ellipse at 50% 30%, #2b2721 0%, #171512 70%);
+  display: flex; align-items: center; justify-content: center;
+}
+.menu-box { text-align: center; }
+.menu-box h1 {
+  font-size: 52px; letter-spacing: 14px; color: var(--brass); font-weight: 700;
+  text-shadow: 0 3px 12px rgba(0,0,0,.8); margin-bottom: 6px;
+}
+.menu-box .tagline { color: var(--ink-dim); letter-spacing: 2px; font-size: 13px; margin-bottom: 40px; }
+.menu-box button {
+  display: block; width: 280px; margin: 10px auto; padding: 13px;
+  background: #262219; color: var(--ink); border: 1px solid var(--brass-dim);
+  font-size: 14px; letter-spacing: 3px; cursor: pointer; border-radius: 3px;
+}
+.menu-box button:hover { border-color: var(--brass); color: var(--brass); background: #2d2820; }
+.menu-box button.danger { border-color: #5a3a32; color: var(--ink-dim); font-size: 11px; padding: 8px; width: 180px; }
+.menu-box button.danger:hover { border-color: var(--danger); color: var(--danger); }
+.menuhint { margin-top: 34px; color: #6b6455; font-size: 12px; letter-spacing: 1px; }
+
+/* ---------- help ---------- */
+#help-overlay {
+  position: absolute; inset: 0; z-index: 35; background: rgba(10,9,8,.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.help-box {
+  background: #211e19; border: 1px solid var(--brass-dim); border-radius: 4px; padding: 22px 28px;
+  max-width: 720px;
+}
+.help-box h2 { color: var(--brass); letter-spacing: 3px; font-size: 15px; margin-bottom: 14px; }
+.help-box h3 { color: var(--ink-dim); letter-spacing: 2px; font-size: 11px; margin-bottom: 8px; }
+.help-cols { display: flex; gap: 40px; }
+.help-box table { font-size: 12px; border-collapse: collapse; }
+.help-box td { padding: 3px 10px 3px 0; }
+.help-box td:first-child { color: var(--brass); white-space: nowrap; }
+.help-box button {
+  margin-top: 18px; background: #2e2a23; border: 1px solid var(--panel-edge); color: var(--ink);
+  padding: 8px 22px; border-radius: 3px; cursor: pointer; letter-spacing: 2px;
+}
+.help-box button:hover { border-color: var(--brass); color: var(--brass); }
+
+/* ---------- tutorial strip ---------- */
+#tutor {
+  position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--brass-dim); border-radius: 3px;
+  padding: 8px 18px; font-size: 13px; letter-spacing: 2px; color: var(--parch);
+  z-index: 16; pointer-events: none; text-align: center;
+  box-shadow: 0 3px 10px rgba(0,0,0,.5);
+}
+
+/* ---------- dev overlay ---------- */
+#devbar {
+  position: absolute; top: 46px; left: 8px; z-index: 50; font-size: 11px;
+  background: rgba(0,0,0,.7); color: #8f8; padding: 6px 8px; border-radius: 3px;
+  font-family: monospace; white-space: pre;
+}

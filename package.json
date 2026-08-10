@@ -1,0 +1,13 @@
+{
+  "name": "steamward",
+  "version": "0.1.0",
+  "description": "STEAMWARD — a browser-based 2.5D feudal-industrial strategic + tactical RTS vertical slice",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8123",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEAMWARD</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%232a2622'/><path d='M16 4 L20 12 L16 28 L12 12 Z' fill='%23c9a959'/></svg>">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- Top bar: resources + time + objective -->
+  <div id="topbar" class="hidden">
+    <div class="brand">STEAMWARD</div>
+    <div class="res" id="res-crowns" title="Crowns — coin for recruitment and equipment"><span class="res-ico ico-crowns"></span><span class="res-val" id="val-crowns">0</span></div>
+    <div class="res" id="res-provisions" title="Provisions — feed recruits and field operations"><span class="res-ico ico-provisions"></span><span class="res-val" id="val-provisions">0</span></div>
+    <div class="res" id="res-coal" title="Coal — fuels pressure equipment and industry"><span class="res-ico ico-coal"></span><span class="res-val" id="val-coal">0</span></div>
+    <div class="spacer"></div>
+    <div id="objective-chip" title="Campaign objective"></div>
+    <div class="spacer"></div>
+    <div id="time-controls">
+      <button id="btn-pause" class="tbtn" title="Pause (Space)">❚❚</button>
+      <button id="btn-play" class="tbtn active" title="Normal speed">▶</button>
+      <button id="btn-fast" class="tbtn" title="Fast speed">▶▶</button>
+    </div>
+    <button id="btn-help" class="tbtn" title="Controls (H)">?</button>
+    <button id="btn-menu" class="tbtn" title="Menu">≡</button>
+  </div>
+
+  <!-- Alerts feed -->
+  <div id="alerts"></div>
+
+  <!-- Bottom-left context panel -->
+  <div id="context-panel" class="hidden"></div>
+
+  <!-- Battle HUD -->
+  <div id="battle-hud" class="hidden">
+    <div id="battle-forces"></div>
+    <div id="battle-selinfo"></div>
+    <div id="battle-buttons">
+      <button class="fbtn" id="btn-form-line" title="Line formation">LINE</button>
+      <button class="fbtn" id="btn-form-deep" title="Deep line">DEEP</button>
+      <button class="fbtn" id="btn-form-loose" title="Loose order">LOOSE</button>
+      <button class="fbtn" id="btn-hero" title="Select commander (F1)">COMMANDER</button>
+      <button class="fbtn warn" id="btn-withdraw" title="Withdraw from the field">WITHDRAW</button>
+    </div>
+  </div>
+
+  <!-- Modal dialog root -->
+  <div id="dialog-root" class="hidden"></div>
+
+  <!-- Main menu -->
+  <div id="mainmenu">
+    <div class="menu-box">
+      <h1>STEAMWARD</h1>
+      <div class="tagline">A feudal land learning to breathe steam</div>
+      <button id="btn-new">NEW CAMPAIGN</button>
+      <button id="btn-continue" class="hidden">CONTINUE</button>
+      <button id="btn-reset" class="hidden danger">RESET SAVE</button>
+      <div class="menuhint">Command a warband. Take territory. Hold it — or lose it.</div>
+    </div>
+  </div>
+
+  <!-- Help overlay -->
+  <div id="help-overlay" class="hidden">
+    <div class="help-box">
+      <h2>FIELD ORDERS</h2>
+      <div class="help-cols">
+        <div>
+          <h3>STRATEGIC MAP</h3>
+          <table>
+            <tr><td>Left click</td><td>select your army / location</td></tr>
+            <tr><td>Right click</td><td>move army / enter location</td></tr>
+            <tr><td>Arrows / edge / MMB drag</td><td>pan camera</td></tr>
+            <tr><td>Wheel</td><td>zoom</td></tr>
+            <tr><td>Space</td><td>pause</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>BATTLE</h3>
+          <table>
+            <tr><td>Left click / drag</td><td>select / box select</td></tr>
+            <tr><td>Right click</td><td>move · attack enemy</td></tr>
+            <tr><td>A + click</td><td>attack-move</td></tr>
+            <tr><td>Ctrl+1–4 / 1–4</td><td>set / recall control group</td></tr>
+            <tr><td>F1</td><td>select commander</td></tr>
+            <tr><td>WASD</td><td>move commander (when selected)</td></tr>
+            <tr><td>Esc</td><td>deselect</td></tr>
+          </table>
+        </div>
+      </div>
+      <button id="btn-close-help">CLOSE</button>
+    </div>
+  </div>
+
+  <!-- Tutorial hint strip -->
+  <div id="tutor" class="hidden"></div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
