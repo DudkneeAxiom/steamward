@@ -274,9 +274,9 @@ export function update(c, dt, rng) {
       if (dist(A.x, A.y, B.x, B.y) > TUNE.encounterRadius) continue;
       const involvesPlayer = A === pa || B === pa;
       if (involvesPlayer) {
-        if (!c.pendingEncounter && fitForDuty(pa.soldiers).length > 0) {
+        const enemy = A === pa ? B : A;
+        if (!c.pendingEncounter && fitForDuty(pa.soldiers).length > 0 && fitForDuty(enemy.soldiers).length > 0) {
           c.pendingEncounter = true;
-          const enemy = A === pa ? B : A;
           events.push({ type: 'encounter', army: pa, enemy });
         }
       } else {

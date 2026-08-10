@@ -648,6 +648,8 @@ window.SW = {
   get mode() { return mode; },
   get campaign() { return campaign; },
   get battle() { return battle; },
+  get cam() { return cam; },
+  get dpr() { return dpr; },
   api,
   Campaign, Battle, Strategic, UI,
   giveResources(crowns = 200, provisions = 50, coal = 50) {

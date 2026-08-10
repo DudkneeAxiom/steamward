@@ -546,6 +546,8 @@ export function updateBattle(b, dt, keys) {
   const eLossRatio = 1 - eAlive / Math.max(1, b.startCounts.enemy);
 
   for (const u of alive) {
+    // a unit killed earlier in this same frame must not act (or un-die)
+    if (u.state === 'dead' || u.state === 'fled') continue;
     u.engagedT = Math.max(0, (u.engagedT || 0) - dt);
     u.hitRecently = false;
     u.cooldown = Math.max(0, u.cooldown - dt);
@@ -566,7 +568,7 @@ export function updateBattle(b, dt, keys) {
       } else {
         u.morale = Math.min(u.moraleMax, u.morale + 0.7 * dt);
       }
-      if (u.morale <= 0 && u.state !== 'routing') {
+      if (u.morale <= 0 && u.state !== 'routing' && u.state !== 'dead') {
         u.state = 'routing';
         u.orderPos = null; u.orderTargetUid = null; u.path = null;
         b.selection.delete(u.uid);

@@ -298,8 +298,8 @@ export function incomeTick(c) {
 
 export function recoveryTick(c, dt) {
   const heal = (s) => { if (s.wounded > 0) s.wounded = Math.max(0, s.wounded - dt); };
-  for (const a of c.armies) if (a.faction === 'player') a.soldiers.forEach(heal);
-  for (const l of c.locations) if (l.owner === 'player') l.garrison.forEach(heal);
+  for (const a of c.armies) a.soldiers.forEach(heal);
+  for (const l of c.locations) l.garrison.forEach(heal);
 }
 
 export function checkObjective(c) {
@@ -336,7 +336,9 @@ export function applyCasualties(c, soldiers, fallenIds, won, rng) {
 export function removeDead(c) {
   for (const a of c.armies) a.soldiers = a.soldiers.filter(s => s.alive);
   for (const l of c.locations) l.garrison = l.garrison.filter(s => s.alive);
-  c.armies = c.armies.filter(a => a.soldiers.length > 0 || a.faction === 'player');
+  // AI warbands with nobody fit to fight scatter rather than limping around.
+  c.armies = c.armies.filter(a => a.faction === 'player' ||
+    a.soldiers.some(s => s.alive && s.wounded <= 0));
 }
 
 // ---------------------------------------------------------------- save / load
