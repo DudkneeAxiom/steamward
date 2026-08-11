@@ -32,4 +32,11 @@ createServer((req, res) => {
   } catch (e) {
     res.writeHead(500); res.end(String(e));
   }
+}).on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    // Another copy is already serving — that's fine, point the player there.
+    console.log(`STEAMWARD is already running on http://localhost:${PORT}`);
+    process.exit(0);
+  }
+  throw e;
 }).listen(PORT, () => console.log(`STEAMWARD on http://localhost:${PORT}`));

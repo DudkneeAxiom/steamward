@@ -20,6 +20,11 @@ npm run serve          # node tools/serve.mjs — http://localhost:8123
 # then open http://localhost:8123
 ```
 
+On Windows you can simply double-click **`PLAY.cmd`** — it starts the server
+and opens the browser for you (close its window to stop). In PowerShell, note
+that `npm` may be blocked by the default script execution policy; `npm.cmd run
+serve` or `node tools/serve.mjs` sidestep that without changing any settings.
+
 Any static file server works (`python3 -m http.server 8123`, `npx serve`,
 nginx, …). `file://` URLs will not work because the game uses ES modules.
 
