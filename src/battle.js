@@ -336,9 +336,16 @@ function snapOpen(b, x, y) {
   return { x: (open % GW) * CELL + CELL / 2, y: Math.floor(open / GW) * CELL + CELL / 2 };
 }
 
+// A group advances at the pace of its slowest soldier, so the commander and
+// the cavalry do not arrive alone and get killed ahead of the line.
+function groupPace(sel) {
+  return sel.length > 1 ? Math.min(...sel.map(u => u.def.speed)) : Infinity;
+}
+
 export function commandMove(b, x, y, attackMove = false) {
   const sel = selectedUnits(b);
   if (sel.length === 0) return false;
+  const pace = groupPace(sel);
   const form = FORM_SPACING[b.formationType] || FORM_SPACING.line;
   // Face along average approach direction; build slots perpendicular to it.
   let mx = 0, my = 0;
@@ -362,6 +369,7 @@ export function commandMove(b, x, y, attackMove = false) {
     u.orderPos = snapOpen(b, tx, ty);
     u.orderTargetUid = null;
     u.attackMove = attackMove;
+    u.speedCap = pace;
     u.path = null; u.pathIdx = 0;
     if (u.state !== 'routing') u.state = 'moving';
   });
@@ -372,10 +380,12 @@ export function commandMove(b, x, y, attackMove = false) {
 export function commandAttack(b, target) {
   const sel = selectedUnits(b);
   if (sel.length === 0 || !target || target.player) return false;
+  const pace = groupPace(sel);
   for (const u of sel) {
     u.orderTargetUid = target.uid;
     u.orderPos = null;
     u.attackMove = false;
+    u.speedCap = pace;
     u.path = null; u.pathIdx = 0;
     if (u.state !== 'routing') u.state = 'moving';
   }
@@ -611,7 +621,11 @@ export function updateBattle(b, dt, keys) {
     }
 
     // ---- decide movement intent
-    let desiredX = 0, desiredY = 0, speed = u.def.speed * (u.vet ? 1.05 : 1);
+    let desiredX = 0, desiredY = 0;
+    let speed = u.def.speed * (u.vet ? 1.05 : 1);
+    // Hold formation pace only while executing the order that set it.
+    if (u.speedCap && (u.orderPos || u.orderTargetUid)) speed = Math.min(speed, u.speedCap);
+    else u.speedCap = 0;
 
     if (u.state === 'routing') {
       const edgeX = u.side === 'left' ? -60 : W + 60;
@@ -825,12 +839,20 @@ export function updateBattle(b, dt, keys) {
     u.y = clamp(ny, 12, H - 12);
     if (moving && u.state === 'moving') u.facing = angleLerp(u.facing, Math.atan2(vy, vx), 0.18);
 
-    // Watchdog: a soldier trying to move but going nowhere for half a minute
-    // has lost the battle in every sense — treat them as slipping off the field
-    // rather than letting one wedged unit hold the engagement open forever.
-    if (moving && Math.hypot(u.x - prevX, u.y - prevY) < 0.4) {
+    // Watchdog for a soldier trying to move but going nowhere — a bad path, or
+    // wedged against scenery. Jostling in a melee or at a gate is normal, so
+    // only unengaged units count, and the first response is to drop the order
+    // and try again. A unit that cannot get anywhere after several attempts has
+    // effectively left the battle, which also guarantees the fight can end.
+    if (moving && u.engagedT <= 0 && Math.hypot(u.x - prevX, u.y - prevY) < 0.4) {
       u.stuckT = (u.stuckT || 0) + dt;
-      if (u.stuckT > 30) { u.state = 'fled'; b.selection.delete(u.uid); }
+      if (u.stuckT > 12) {
+        u.stuckT = 0;
+        u.stuckCount = (u.stuckCount || 0) + 1;
+        u.path = null; u.orderPos = null; u.orderTargetUid = null; u.autoTarget = null;
+        u.state = 'idle';
+        if (u.stuckCount > 4) { u.state = 'fled'; b.selection.delete(u.uid); }
+      }
     } else {
       u.stuckT = 0;
     }

@@ -164,14 +164,15 @@ export function newCampaign(seed = (Date.now() % 100000) | 0) {
   locG('tollfort', { levy: 2, spearman: 2, bowman: 1 });
   locG('keepB', { spearman: 3, bowman: 2, shieldman: 3 });
 
-  // Independent sites keep their own watch, so expansion has to be earned.
-  // Merren stays open as the player's first, free lesson in taking ground.
-  locG('thornfield', { levy: 1 });
-  locG('market', { levy: 2 });
-  locG('watch', { levy: 1, bowman: 1 });
-  locG('coal', { levy: 2 });
-  locG('foundry', { levy: 2, bowman: 1 });
-  locG('bridgefort', { levy: 2, spearman: 1, bowman: 1 });
+  // Independent sites keep their own watch, so expansion has to be earned and
+  // the valuable ones cost blood. Merren stays open as the player's first,
+  // free lesson in taking ground.
+  locG('thornfield', { levy: 2 });
+  locG('market', { levy: 2, spearman: 1 });
+  locG('watch', { levy: 1, bowman: 2 });
+  locG('coal', { levy: 2, shieldman: 1, bowman: 1 });
+  locG('foundry', { levy: 2, spearman: 1, shieldman: 1, bowman: 1 });
+  locG('bridgefort', { levy: 2, spearman: 2, shieldman: 1, bowman: 1 });
 
   c.armies.push(makeArmy('falkmoor', 1700, 520, troopSet(rng, 'falkmoor', { levy: 2, spearman: 2, bowman: 2 }),
     { ai: { mode: 'patrol', targetKey: null, thinkT: rng.float(1, 4), homeKey: 'keepF' } }));
