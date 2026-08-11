@@ -224,12 +224,19 @@ def prism(parent, p0, p1, r0, r1, material, sides=6, phase=0.0, name='prism'):
 def _conifer(name, seed, tiers, trunk_r, lean, mats, spur=None):
     """Shared conifer body.
 
-    `tiers` are explicit (base z, width, top fraction, height) skirts stacked
-    up a leaning bole, deliberately wider than they are tall: a conifer is
-    read from the *steps* between skirts, and tall narrow tiers merge into one
-    featureless spike. Each skirt is yawed off its neighbours and its corners
-    jittered so the lower edge is ragged, and `spur` hangs one extra broken
-    skirt off one side so no two variants share a profile.
+    `tiers` are explicit (base z, width, top fraction, height, dx, dy) skirts
+    stacked up a leaning bole. Two numbers do most of the work:
+
+      * the *top fraction* is kept low (~0.35). A skirt with a wide top face
+        shows that face as a pale horizontal plate and the tree reads as a
+        pagoda; a narrow top is swallowed by the skirt above it.
+      * skirts overlap by roughly half their height, so the silhouette steps
+        instead of stacking.
+
+    Each skirt is yawed off its neighbours (a yawed square reads as a ragged
+    diamond, not a box), its corners jittered, and shoved off the trunk axis
+    by its own (dx, dy). `spur` hangs one broken branch tier off one side, so
+    no two variants share a profile.
 
     `lean` is the sideways offset of the treetop; every skirt and the bole's
     top face ride that line, which keeps the roots planted while the crown
@@ -240,72 +247,79 @@ def _conifer(name, seed, tiers, trunk_r, lean, mats, spur=None):
     lx, ly = lean
     height = tiers[-1][0] + tiers[-1][3]
 
-    bole_top = tiers[-1][0]
-    frustum(0, 0, -1.5, trunk_r * 2.2, trunk_r * 2.2,
-            trunk_r * 0.9, trunk_r * 0.9, bole_top + 1.5, 'trunk', g,
+    bole_top = tiers[0][0] + tiers[0][3] * 0.7
+    frustum(0, 0, -1.5, trunk_r * 2.3, trunk_r * 2.3,
+            trunk_r * 1.1, trunk_r * 1.1, bole_top + 1.5, 'trunk', g,
             shift=(lx * bole_top / height, ly * bole_top / height),
             name='bole')
+    for i in range(3):
+        a = i * TAU / 3.0 + 0.7
+        limb(g, (0, 0, 4.0),
+             (math.cos(a) * trunk_r * 2.2, math.sin(a) * trunk_r * 2.2, -2.0),
+             trunk_r * 0.5, trunk_r * 0.3, 'trunk', 'root')
 
-    for i, (z, w, topf, h) in enumerate(tiers):
+    for i, (z, w, topf, h, dx, dy) in enumerate(tiers):
         f = z / height
-        cx = lx * f + rng.uniform(-1.2, 1.2)
-        cy = ly * f + rng.uniform(-1.2, 1.2)
+        cx = lx * f + dx + rng.uniform(-1.0, 1.0)
+        cy = ly * f + dy + rng.uniform(-1.0, 1.0)
         frustum(cx, cy, z,
-                w * rng.uniform(0.95, 1.05), w * rng.uniform(0.95, 1.05),
+                w * rng.uniform(0.94, 1.06), w * rng.uniform(0.94, 1.06),
                 w * topf, w * topf, h, mats[i % len(mats)], g,
-                yaw=rng.uniform(-0.6, 0.6), jit=w * 0.06, rng=rng,
+                yaw=rng.uniform(-0.7, 0.7), jit=w * 0.07, rng=rng,
                 name='skirt')
 
     if spur:
         sz, sw, sh, sa = spur
         f = sz / height
-        frustum(lx * f + math.cos(sa) * sw * 0.45,
-                ly * f + math.sin(sa) * sw * 0.45, sz,
-                sw, sw * 0.8, sw * 0.25, sw * 0.2, sh, mats[0], g,
-                yaw=sa, jit=sw * 0.08, rng=rng, name='spur')
+        frustum(lx * f + math.cos(sa) * sw * 0.5,
+                ly * f + math.sin(sa) * sw * 0.5, sz,
+                sw, sw * 0.7, sw * 0.18, sw * 0.14, sh, mats[0], g,
+                yaw=sa, jit=sw * 0.10, rng=rng, name='spur')
     return g
 
 
 def tree_pine_a():
-    """The standard forest conifer: four broad skirts stepping evenly up an
-    almost upright bole, with one broken tier jutting north-east."""
+    """The standard forest conifer: four broad skirts stepping up an almost
+    upright bole, a good arm's length of bare trunk below them, and one
+    broken tier jutting north-east."""
     return _conifer(
         'tree_pine_a', 21,
-        tiers=((16.0, 42.0, 0.60, 24.0),
-               (32.0, 35.0, 0.58, 23.0),
-               (47.0, 27.0, 0.55, 22.0),
-               (62.0, 20.0, 0.10, 30.0)),
-        trunk_r=3.0, lean=(2.5, -1.5),
+        tiers=((22.0, 44.0, 0.38, 26.0, 0.0, 0.0),
+               (36.0, 36.0, 0.36, 26.0, -1.5, 1.0),
+               (50.0, 27.0, 0.34, 25.0, 1.5, -1.0),
+               (63.0, 19.0, 0.07, 32.0, 0.0, 0.0)),
+        trunk_r=3.4, lean=(3.0, -1.5),
         mats=('foliage_a', 'foliage_b'),
-        spur=(38.0, 22.0, 9.0, R(55)))
+        spur=(30.0, 21.0, 8.0, R(55)))
 
 
 def tree_pine_b():
     """Crowded-forest tree that raced its neighbours for light: a long bare
-    bole, five narrow tiers bunched into the top third, spindly crest."""
+    bole, five narrow tiers bunched into the top half, spindly crest."""
     return _conifer(
         'tree_pine_b', 33,
-        tiers=((32.0, 27.0, 0.62, 17.0),
-               (43.0, 25.0, 0.60, 16.0),
-               (54.0, 21.0, 0.58, 15.0),
-               (65.0, 17.0, 0.55, 15.0),
-               (77.0, 13.0, 0.10, 28.0)),
-        trunk_r=2.6, lean=(-3.0, 2.0),
+        tiers=((34.0, 30.0, 0.40, 20.0, 0.0, 0.0),
+               (44.0, 27.0, 0.38, 20.0, 1.0, -0.8),
+               (54.0, 23.0, 0.36, 19.0, -1.2, 0.8),
+               (64.0, 18.0, 0.34, 18.0, 0.8, 0.6),
+               (74.0, 14.0, 0.07, 31.0, 0.0, 0.0)),
+        trunk_r=2.8, lean=(-3.5, 2.0),
         mats=('foliage_a', 'foliage_b'),
-        spur=(48.0, 16.0, 7.0, R(-130)))
+        spur=(40.0, 15.0, 6.5, R(-130)))
 
 
 def tree_pine_c():
-    """Edge-of-wood tree with room to spread: squat, leaning hard east, three
-    heavy skirts with the lowest almost touching the ground."""
+    """Edge-of-wood tree with room to spread: squat and leaning hard east,
+    three heavy skirts shoved off the trunk axis in different directions so
+    it never settles into a cone, with a low branch out to the south-west."""
     return _conifer(
         'tree_pine_c', 47,
-        tiers=((7.0, 52.0, 0.62, 26.0),
-               (26.0, 41.0, 0.58, 25.0),
-               (45.0, 29.0, 0.12, 29.0)),
-        trunk_r=3.6, lean=(8.0, -3.5),
+        tiers=((14.0, 46.0, 0.40, 27.0, 0.0, 0.0),
+               (31.0, 34.0, 0.36, 26.0, -4.5, 3.0),
+               (48.0, 23.0, 0.08, 30.0, 2.5, -2.0)),
+        trunk_r=4.0, lean=(9.0, -4.0),
         mats=('foliage_b', 'foliage_c'),
-        spur=(18.0, 28.0, 11.0, R(200)))
+        spur=(20.0, 26.0, 10.0, R(205)))
 
 
 def _broadleaf(name, seed, trunk_h, trunk_r, lean, forks, lobes, mats):
@@ -354,11 +368,11 @@ def tree_broad_a():
         forks=((R(165), R(58), 24.0, 3.0),
                (R(-25), R(64), 27.0, 3.2),
                (R(70), R(60), 19.0, 2.3)),
-        lobes=((1, 0, 40, 24, 22, 28, 0.58, 1, 2),
-               (-19, 8, 36, 16, 15, 20, 0.56, -4, 1),
-               (16, -10, 37, 15, 14, 19, 0.54, 4, -3),
-               (-3, -3, 52, 17, 16, 22, 0.60, 0, 0),
-               (11, 11, 46, 13, 12, 16, 0.56, 3, 3)),
+        lobes=((1, 0, 38, 24, 22, 28, 0.58, 1, 2),
+               (-19, 8, 34, 16, 15, 20, 0.56, -4, 1),
+               (16, -10, 35, 15, 14, 19, 0.54, 4, -3),
+               (-5, -4, 52, 18, 16, 25, 0.60, -2, -1),
+               (12, 8, 45, 14, 13, 19, 0.56, 3, 3)),
         mats=('foliage_b', 'foliage_c', 'foliage_b'))
 
 
@@ -534,34 +548,34 @@ def rock_c():
 def rock_outcrop():
     """Bedrock breaking the surface.
 
-    One dominant mass sheared off to a sheer face looking -Y, stepping back in
-    two ledges toward +Y, with the debris that fell off the face lying at its
-    foot. The beds dip a couple of degrees so the formation never reads as a
-    stack of even courses.
+    Everything here is yawed off the world axes and tapers hard toward its
+    top: an axis-aligned mass with a flat top is a building, and that is the
+    single failure mode of blocky rock. A dominant block is sheared off to a
+    face looking -Y, a second block has parted from it along a fracture, the
+    beds behind step back and up, and the debris lies where it fell.
     """
     g = C.empty('rock_outcrop')
     rng = random.Random(910)
-    dip = R(3.0)
 
-    # the sheer face: two big blocks parted by a fracture, ground to full height
-    frustum(-11.0, -8.0, -2.0, 27.0, 20.0, 22.0, 15.0, 34.0, 'stone', g,
-            shift=(2.0, 3.0), jit=1.4, rng=rng, name='face')
-    frustum(14.0, -6.0, -2.0, 18.0, 17.0, 14.0, 12.0, 25.0, 'stone_dark', g,
-            shift=(-2.5, 2.5), jit=1.4, rng=rng, name='face')
-    # the mass behind, stepping back and up in dipping beds
-    frustum(0.0, 10.0, -2.0, 48.0, 26.0, 44.0, 22.0, 22.0, 'stone_dark', g,
-            tilt=dip, shift=(1.0, 2.0), jit=1.6, rng=rng, name='bed')
-    frustum(-2.0, 16.0, 19.0, 38.0, 20.0, 33.0, 16.0, 15.0, 'stone_light', g,
-            tilt=dip, shift=(-2.0, 2.0), jit=1.4, rng=rng, name='bed')
-    frustum(3.0, 21.0, 32.0, 25.0, 15.0, 20.0, 11.0, 11.0, 'stone', g,
-            tilt=dip, shift=(1.5, 1.5), jit=1.2, rng=rng, name='bed')
-    # a ledge shelf jutting from the face, and the topsoil the wind left
-    frustum(-8.0, -12.0, 24.0, 20.0, 9.0, 17.0, 7.0, 3.5, 'stone_light', g,
-            jit=0.8, rng=rng, name='ledge')
-    frustum(2.0, 24.0, 41.0, 20.0, 12.0, 16.0, 10.0, 2.4, 'dirt', g,
-            jit=0.7, rng=rng, name='topsoil')
-    boulder(-6.0, 19.0, 33.0, 8.0, 7.0, 10.0, 'stone_light', g, ring=0.58,
-            base=0.76, tip=(3.0, 2.5), phase=0.9, jit=0.24, rng=rng)
+    # the sheared face: two blocks parted along a fracture, both leaning back
+    frustum(-10.0, -7.0, -2.0, 29.0, 21.0, 15.0, 11.0, 35.0, 'stone', g,
+            yaw=R(9), shift=(4.0, 6.0), jit=1.8, rng=rng, name='face')
+    frustum(14.0, -4.0, -2.0, 19.0, 18.0, 9.0, 8.0, 26.0, 'stone_dark', g,
+            yaw=R(-16), shift=(-3.5, 5.0), jit=1.6, rng=rng, name='face')
+    # the mass behind, stepping back and up
+    frustum(-1.0, 11.0, -2.0, 45.0, 25.0, 26.0, 14.0, 31.0, 'stone_dark', g,
+            yaw=R(5), tilt=R(3), shift=(3.0, 5.0), jit=2.0, rng=rng,
+            name='bed')
+    frustum(-4.0, 17.0, 27.0, 29.0, 18.0, 14.0, 9.0, 17.0, 'stone_light', g,
+            yaw=R(-11), tilt=R(4), shift=(-4.0, 4.0), jit=1.6, rng=rng,
+            name='bed')
+    # a shelf jutting from the face, a perched block, the soil the wind left
+    frustum(-9.0, -13.0, 23.0, 21.0, 10.0, 15.0, 7.0, 3.5, 'stone_light', g,
+            yaw=R(6), jit=0.9, rng=rng, name='ledge')
+    boulder(-7.0, 14.0, 30.0, 9.0, 7.5, 11.0, 'stone', g, ring=0.58,
+            base=0.72, tip=(3.5, 3.0), phase=0.9, jit=0.26, rng=rng)
+    frustum(4.0, 22.0, 40.0, 18.0, 12.0, 13.0, 8.0, 2.4, 'dirt', g,
+            yaw=R(-8), jit=0.8, rng=rng, name='topsoil')
     # talus: what has come off the face
     for (x, y, rx, h, m) in ((-24.0, -22.0, 6.0, 6.0, 'stone'),
                              (-11.0, -26.0, 4.5, 4.5, 'stone_dark'),
@@ -573,59 +587,81 @@ def rock_outcrop():
 
 
 def cliff_face_segment():
-    """A 60 x 60 tile for the edge of raised terrain.
+    """A 60-long tile for the edge of raised terrain, about 60 tall.
 
     Runs along X, flush at x = -30 and x = +30 so tiles butt without a seam.
     The exposed face looks -Y; the rock body fills 0 <= y <= 22, the side
-    buried in the hill, and everything that projects forward of the face stays
-    inside |x| < 26 so neighbouring tiles never intersect.
+    buried in the hill, and everything that projects forward stays inside
+    |x| < 27 so neighbouring tiles never intersect.
 
-    The hard part of a rock face is *not* looking like masonry. Three things
-    do that work here: the beds are of deliberately unequal thickness, they
-    batter backwards as they rise (each bed's top face is set further +Y than
-    its bottom), and the front is broken by full-height buttresses and a
-    fracture so the eye reads vertical jointing across the horizontal beds.
-    The soil on top is three separate chunks at three heights, because a
-    continuous brown strip along the lip reads as a roof.
+    The hard part of a rock face is not looking like a wall, and the thing
+    that makes it look like a wall is a horizontal line running the full 60.
+    So no bed here is one piece: each is broken into three chunks of unequal
+    width, depth and height, so a bed's top edge is a staircase and its front
+    is a set of planes at different distances. Some chunks batter backwards,
+    some overhang — an overhang is the one profile masonry never has. Vertical
+    buttresses in front then break the remaining horizontals, and the topsoil
+    is three separate lumps because a continuous brown strip along the lip
+    reads as a roof.
     """
     g = C.empty('cliff_face_segment')
     rng = random.Random(920)
 
     # the hill behind: guarantees the tile is opaque whatever sits in front
-    C.box(0, 12.0, -2.0, 60.0, 21.0, 61.0, 'stone_dark', g, name='core')
+    C.box(0, 12.5, -2.0, 60.0, 20.0, 60.0, 'stone_dark', g, name='core')
 
-    # beds — unequal thicknesses, each battering back as it rises
-    for (z, h, fy, dep, m) in ((-2.0, 16.0, -6.0, 15.0, 'stone'),
-                               (13.0, 11.0, -3.0, 11.0, 'stone_light'),
-                               (23.0, 19.0, -5.5, 14.0, 'stone'),
-                               (41.0, 8.0, -2.0, 10.0, 'stone_dark'),
-                               (48.0, 12.0, -4.0, 12.0, 'stone_light')):
-        frustum(0, fy + dep * 0.5, z, 60.0, dep, 60.0, dep * 0.62, h, m, g,
-                shift=(0.0, dep * 0.20), name='bed')
+    def chunk(x0, x1, z, y_lo, y_hi, dep, h, tilt, m):
+        """One piece of a bed. y_lo/y_hi are where the front face sits at the
+        bottom and at the top: y_hi > y_lo batters back, y_hi < y_lo
+        overhangs. End chunks take no jitter so the tile stays flush."""
+        w = x1 - x0
+        d1 = dep * 0.78
+        frustum((x0 + x1) * 0.5, y_lo + dep * 0.5, z, w, dep, w, d1, h, m, g,
+                tilt=R(tilt),
+                shift=(0.0, (y_hi + d1 * 0.5) - (y_lo + dep * 0.5)),
+                jit=0.0 if (x0 <= -30.0 or x1 >= 30.0) else 0.9, rng=rng,
+                name='bed')
 
-    # buttresses and a fracture: vertical jointing read across the beds
-    frustum(-17.0, -8.0, -2.0, 17.0, 11.0, 13.0, 8.0, 33.0, 'stone', g,
-            shift=(1.5, 3.0), jit=1.3, rng=rng, name='buttress')
-    frustum(15.0, -7.0, 8.0, 14.0, 10.0, 11.0, 7.0, 30.0, 'stone_light', g,
-            shift=(-1.5, 2.5), jit=1.3, rng=rng, name='buttress')
-    frustum(0.0, -9.5, -2.0, 8.0, 8.0, 6.0, 6.0, 21.0, 'stone_dark', g,
-            shift=(2.5, 2.5), jit=1.0, rng=rng, name='pillar')
+    for row in (
+            # x0,   x1,    z,   y_lo,  y_hi, dep,   h,  tilt, material
+            ((-30.0, -8.4, -2.0, -7.0, -4.0, 16.0, 19.0,  2.0, 'stone'),
+             (-9.0, 11.4, -2.0, -4.0, -2.5, 13.0, 15.5, -1.5, 'stone_dark'),
+             (10.8, 30.0, -2.0, -6.0, -3.0, 15.0, 21.0,  1.0, 'stone')),
+            ((-30.0, -13.4, 15.0, -3.0, -4.5, 11.5, 14.0, -2.0, 'stone_light'),
+             (-14.0, 8.4, 15.0, -6.5, -3.5, 15.0, 17.0,  1.5, 'stone'),
+             (7.8, 30.0, 15.0, -4.0, -5.5, 12.5, 12.0, -1.0, 'stone_light')),
+            ((-30.0, -5.4, 30.0, -5.0, -2.0, 13.5, 17.0,  2.5, 'stone'),
+             (-6.0, 14.4, 30.0, -2.0, -4.5, 10.5, 13.0, -2.0, 'stone_dark'),
+             (13.8, 30.0, 30.0, -5.5, -2.5, 14.0, 19.0,  1.0, 'stone')),
+            ((-30.0, -11.4, 45.0, -3.0, -1.5, 11.0, 15.5, -1.5, 'stone_light'),
+             (-12.0, 9.4, 45.0, -5.0, -2.0, 13.0, 13.5,  2.0, 'stone'),
+             (8.8, 30.0, 45.0, -2.0, -3.5, 10.0, 16.5, -1.0, 'stone_dark'))):
+        for c in row:
+            chunk(*c)
+
+    # buttresses: vertical jointing read across what horizontals are left
+    frustum(-19.0, -9.0, -2.0, 15.0, 11.0, 9.0, 7.0, 34.0, 'stone', g,
+            yaw=R(7), shift=(2.0, 4.0), jit=1.3, rng=rng, name='buttress')
+    frustum(16.0, -8.0, 6.0, 13.0, 10.0, 8.0, 6.5, 32.0, 'stone_light', g,
+            yaw=R(-9), shift=(-2.0, 3.5), jit=1.3, rng=rng, name='buttress')
+    frustum(1.0, -10.0, -2.0, 8.0, 8.0, 5.0, 5.0, 19.0, 'stone_dark', g,
+            yaw=R(14), shift=(2.5, 3.0), jit=1.0, rng=rng, name='pillar')
 
     # shelves where a harder bed has resisted the weather
-    for (x, z, w, dep, m) in ((-6.0, 25.0, 26.0, 8.0, 'stone_light'),
-                              (17.0, 40.0, 18.0, 6.5, 'stone'),
-                              (-21.0, 45.0, 14.0, 6.0, 'stone_dark')):
-        frustum(x, -dep * 0.5 + 1.0, z, w, dep, w * 0.88, dep * 0.7, 3.2,
-                m, g, jit=0.6, rng=rng, name='ledge')
+    for (x, z, w, dep, m, yw) in ((-6.0, 26.0, 25.0, 8.0, 'stone_light', 4.0),
+                                  (17.0, 41.0, 17.0, 6.5, 'stone', -6.0),
+                                  (-22.0, 46.0, 13.0, 6.0, 'stone_dark', 5.0)):
+        frustum(x, -dep * 0.5 + 1.0, z, w, dep, w * 0.85, dep * 0.6, 3.2,
+                m, g, yaw=R(yw), jit=0.6, rng=rng, name='ledge')
 
-    # topsoil: three chunks at three heights, not one continuous lip
-    for (x, y, w, dep, z, h) in ((-19.0, 4.0, 20.0, 17.0, 57.5, 3.0),
-                                 (3.0, 1.5, 18.0, 14.0, 58.5, 2.6),
-                                 (21.0, 5.0, 16.0, 16.0, 56.5, 3.4)):
+    # topsoil: three lumps at three heights, not one continuous lip
+    for (x, y, w, dep, z, h) in ((-19.0, 4.0, 21.0, 17.0, 58.0, 2.6),
+                                 (3.0, 1.5, 19.0, 14.0, 59.0, 2.2),
+                                 (21.0, 5.0, 17.0, 16.0, 57.0, 3.0)):
         frustum(x, y, z, w, dep, w * 0.9, dep * 0.85, h, 'dirt', g,
                 jit=0.7, rng=rng, name='soil')
-    frustum(11.0, -1.0, 55.0, 9.0, 8.0, 7.0, 6.0, 6.0, 'stone', g,
-            shift=(0.5, 1.5), jit=0.8, rng=rng, name='crag')
+    frustum(11.0, -1.0, 55.0, 8.0, 8.0, 5.0, 5.0, 5.5, 'stone', g,
+            yaw=R(18), shift=(0.5, 1.5), jit=0.8, rng=rng, name='crag')
 
     # scree piled against the foot of the face
     for (x, y, rx, h, m) in ((-22.0, -12.0, 5.5, 5.5, 'stone_dark'),
@@ -813,6 +849,10 @@ def _sheet(path, span, top, width=1500, height=470, angle=22.0, azimuth=0.0):
     cam.data.ortho_scale = span
     el, az = R(angle), R(azimuth)
     dist = span * 3
+    # default clip_end is 1000 units; a wide sheet stands the camera further
+    # back than that and silently renders an empty frame
+    cam.data.clip_start = 1.0
+    cam.data.clip_end = dist * 4.0
     aim = top * 0.42
     cam.location = (dist * math.cos(el) * math.sin(az),
                     -dist * math.cos(el) * math.cos(az),

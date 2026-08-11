@@ -3,3 +3,5 @@ test-results/
 playwright-report/
 # generated sprite atlases are committed on purpose
 .bpyenv/
+__pycache__/
+*.pyc

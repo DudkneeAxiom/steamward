@@ -520,3 +520,143 @@ def tower_square():
     pitched_roof(tx0 + 9.0, ty0 + 9.0, 86.6, 16.0, 16.0, 10.0, 'roof_slate', g,
                  overhang=1.8, eave='timber')
     return g
+
+
+# -------------------------------------------------------------- gatehouse
+
+def _gate_winch(g):
+    """The machine that lifts the portcullis, and nothing that does not serve
+    it: fire heats the boiler, the boiler feeds the cylinder, the cylinder
+    cranks the drum, the drum winds two chains down through the deck onto the
+    portcullis head, and a ratchet holds the load when the fire is banked."""
+    DZ, AX, AY = 58.0, 76.0, -13.0
+
+    for sx in (-1, 1):                                    # posts and plates
+        for py in (-16.0, 10.0):
+            bx(g, sx * 16 - 2.0, sx * 16 + 2.0, py - 2.0, py + 2.0, DZ, 82.0, 'timber')
+        diag(g, sx * 16, -16.0, 74.0, 9.0, 2.0, 'timber', pitch=R(38), yaw=R(90))
+    for py in (-16.0, 10.0):
+        bx(g, -18.0, 18.0, py - 2.2, py + 2.2, 82.0, 85.0, 'timber')
+    pitched_roof(0, -3.0, 85.0, 34.0, 28.0, 9.0, 'roof_slate', g, overhang=2.6)
+
+    for sx in (-1, 1):                                    # drum bearings
+        bx(g, sx * 13 - 2.2, sx * 13 + 2.2, AY - 3.2, AY + 3.2, DZ, 72.6, 'stone')
+        bx(g, sx * 13 - 2.9, sx * 13 + 2.9, AY - 3.9, AY + 3.9, 72.6, 78.4, 'iron_dark')
+    cyl_axis(g, 'x', 0, AY, AX, 1.8, 40.0, 'steel', verts=8)       # shaft
+    cyl_axis(g, 'x', 0, AY, AX, 4.6, 21.0, 'iron', verts=10)       # drum
+    for sx in (-1, 1):                                             # chain coils
+        cyl_axis(g, 'x', sx * 6.0, AY, AX, 5.8, 3.4, 'iron_dark', verts=10)
+        chain(g, sx * 6.0, AY, DZ - 0.5, AX - 5.4, s=1.5, links=6)
+        bx(g, sx * 6 - 2.4, sx * 6 + 2.4, AY - 2.6, AY + 2.6, DZ - 0.8, DZ + 0.6, 'soot')
+
+    cx = -17.6                                            # crank and cylinder
+    cyl_axis(g, 'x', cx, AY, AX, 4.8, 2.4, 'iron', verts=10)
+    cyl_axis(g, 'x', cx, AY + 3.4, AX, 1.3, 3.0, 'steel', verts=8)
+    diag(g, cx, AY + 3.4, AX, 8.2, 1.7, 'steel', pitch=R(-14), yaw=R(90), cross=1.7)
+    bx(g, cx - 3.6, cx + 3.6, -4.0, 10.0, DZ, 70.2, 'stone')
+    bx(g, cx - 4.2, cx + 4.2, -4.6, 10.6, 70.2, 71.6, 'iron_dark')
+    cyl_axis(g, 'y', cx, 3.6, 74.0, 3.9, 11.0, 'iron', verts=10)
+    cyl_axis(g, 'y', cx, 9.7, 74.0, 4.4, 2.4, 'steel', verts=10)
+    cyl_axis(g, 'y', cx, -1.4, 74.0, 4.4, 2.0, 'steel', verts=10)
+
+    rx = 17.6                                             # ratchet and pawl
+    cyl_axis(g, 'x', rx, AY, AX, 5.6, 2.6, 'iron', verts=10)
+    bx(g, rx - 1.2, rx + 1.2, AY + 3.0, AY + 5.0, AX + 2.0, AX + 8.0, 'iron')
+    diag(g, rx, AY + 4.0, AX + 7.0, 8.0, 1.8, 'iron_dark', pitch=R(-32), yaw=R(-90))
+
+    bx(g, 6.0, 20.0, 0.0, 12.0, DZ, 65.0, 'iron_dark')    # firebox
+    bx(g, 20.0, 20.9, 3.0, 9.0, 59.5, 63.5, 'iron')
+    bx(g, 20.9, 21.3, 4.0, 8.0, 60.0, 63.0, 'ember')
+    cyl(13.0, 6.0, 65.0, 6.2, 13.0, 'iron', g, verts=10)  # boiler
+    for zz in (67.0, 71.0, 75.0):
+        c.rivet_band(13.0, 6.0, zz, 6.2, parent=g, verts=10)
+    cyl(13.0, 6.0, 78.0, 3.4, 3.2, 'brass', g, verts=8)   # steam dome
+    cyl(13.0, 6.0, 81.2, 2.5, 13.0, 'iron_dark', g, verts=8)   # chimney
+    cyl(13.0, 6.0, 93.0, 3.0, 2.0, 'iron', g, verts=8)
+    cyl(13.0, 8.0, 79.8, 1.5, 2.0, 'copper', g, verts=6)  # dome -> pipe
+    cyl_axis(g, 'y', 13.0, 8.8, 80.6, 1.5, 4.0, 'copper', verts=6)
+    cyl_axis(g, 'x', -2.3, 9.7, 80.6, 1.5, 30.6, 'copper', verts=6)
+    cyl(cx, 9.7, 76.4, 1.5, 4.6, 'copper', g, verts=6)
+
+
+def gatehouse():
+    """Two flanking towers, a gate passage under a machicolation, timber
+    leaves behind a portcullis, and the steam winch on the roof that lifts it.
+    120 wide so it drops straight into the 60-unit wall grid."""
+    g = empty('gatehouse')
+    rng = random.Random(41)
+    GX, GY0, GY1 = 24.0, -20.0, 20.0        # gate block
+    PW, SPR = 11.0, 30.0                    # passage half-width, arch springing
+    DZ = 58.0
+
+    for sx in (-1, 1):                       # wall stubs, on the merlon grid
+        curtain(g, 'x', 0.0, -1, 50.0 * sx if sx > 0 else -60.0,
+                60.0 if sx > 0 else -50.0, merlons=[sx * 55.0],
+                corbels=[sx * 52.5, sx * 58.5])
+
+    for sx in (-1, 1):                       # flanking towers
+        a, b = (24.0, 50.0) if sx > 0 else (-50.0, -24.0)
+        bx(g, a, b, -31.5, 21.5, 0, 9.0, 'stone_dark')
+        bx(g, a, b, -29.8, 19.8, 9.0, 14.0, 'stone')
+        bx(g, a, b, -28.0, 18.0, 14.0, 76.0, 'stone')
+        bx(g, a - 0.8, b + 0.8, -28.8, 18.8, 30.0, 31.6, 'stone_dark')
+        bx(g, a - 1.4, b + 1.4, -29.4, 19.4, 65.0, 67.4, 'stone_light')
+        for u in (a + 8.0, b - 8.0):
+            loop_hole(g, u, -28.0, 22.0, '-y')
+            loop_hole(g, u, -28.0, 40.0, '-y')
+            loop_hole(g, u, -28.0, 54.0, '-y')
+        for v in (-18.0, -4.0, 10.0):
+            loop_hole(g, b, v, 36.0, '+x') if sx > 0 else loop_hole(g, a, v, 36.0, '-x')
+        for _ in range(6):
+            u = rng.uniform(a + 4, b - 4)
+            z = rng.uniform(16, 62)
+            bx(g, u - 4.5, u + 4.5, -28.5, -27.8, z, z + rng.uniform(2.8, 4.0),
+               rng.choice(('stone_light', 'stone_dark')))
+        battlements(g, a - 2.0, b + 2.0, -30.0, 20.0, 76.0, 82.0, 92.0,
+                    thick=9.0, period=11.0, mer=6.2, corner=10.0, corbel=6.0)
+
+    # gate block: piers either side of the passage, arch head above
+    bx(g, -GX, GX, GY0 - 3.5, GY1 + 3.5, 0, 9.0, 'stone_dark')
+    bx(g, -GX, GX, GY0 - 1.8, GY1 + 1.8, 9.0, 14.0, 'stone')
+    for sx in (-1, 1):
+        bx(g, sx * PW, sx * GX, GY0, GY1, 0, DZ, 'stone')
+        bx(g, sx * PW, sx * (PW + 1.6), GY0 - 0.6, GY1 + 0.6, 0, SPR, 'stone_light')
+    arch_head(g, 'x', 0.0, PW, SPR, GY0, GY1, DZ, 'stone', steps=7)
+    bx(g, -PW, PW, GY0, GY1, 0, 1.2, 'stone_dark')            # passage paving
+    for yv, sgn in ((GY0, -1), (GY1, 1)):                     # voussoirs, both ends
+        for k in range(7):
+            th = math.pi * (k + 0.5) / 7
+            box(math.cos(th) * (PW + 2.8), yv + sgn * 0.7,
+                SPR + math.sin(th) * (PW + 2.8) - 2.9, 5.4, 1.6, 5.8,
+                'stone_light', g, rot=(0, -th, 0))
+
+    # machicolation over the gate — corbels, a projecting box, murder holes
+    for u in (-16.0, -8.0, 0.0, 8.0, 16.0):
+        bx(g, u - 2.3, u + 2.3, -26.0, GY0, 41.0, 46.0, 'stone_light')
+    bx(g, -GX, GX, -26.0, GY0, 46.0, DZ, 'stone')
+    for u in (-9.0, 0.0, 9.0):
+        bx(g, u - 2.6, u + 2.6, -24.6, -21.4, 45.3, 46.7, 'soot')
+
+    # portcullis, hauled up into its slot; you can see the chains that did it
+    for sx in (-1, 1):
+        bx(g, sx * PW, sx * (PW + 1.7), -14.8, -11.2, 0, 46.0, 'stone_dark')
+    for i in range(8):
+        u = -9.6 + i * 2.74
+        bx(g, u - 0.75, u + 0.75, -13.7, -12.3, 18.0, 46.0, 'iron_dark')
+        wedge(u, -13.0, 15.6, 1.7, 1.7, 2.6, 'steel', g, rot=(0, R(180), 0))
+    for zz in (19.0, 31.0, 43.0):
+        bx(g, -PW, PW, -13.9, -12.1, zz, zz + 1.8, 'iron')
+
+    # gate leaves, hung on pintles, barred
+    for sx in (-1, 1):
+        plank_door(g, sx * 0.35 if sx > 0 else -10.8, 10.8 if sx > 0 else -0.35,
+                   7.4, 2.6, 0, 34.0, sgn=-1, bands=3)
+        for zz in (5.0, 28.0):
+            bx(g, sx * 10.6, sx * (PW + 0.9), 4.4, 8.2, zz, zz + 3.2, 'iron_dark')
+    bx(g, -PW, PW, 6.0, 7.6, 34.0, 40.5, 'timber')
+    bx(g, -PW, PW, 3.6, 4.6, 16.0, 19.2, 'iron')              # drawbar
+
+    battlements(g, -GX, GX, -26.0, GY1, DZ, 64.0, 73.0, thick=7.0,
+                period=11.0, mer=6.2, corner=9.0)
+    _gate_winch(g)
+    return g
