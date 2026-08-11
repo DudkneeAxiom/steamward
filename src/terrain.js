@@ -271,7 +271,9 @@ export function buildWorldHeightfield(spec) {
   const platforms = [];
   for (const loc of spec.locations || []) {
     const r = loc.platform || 108;
-    const level = quantise(hf.heightAt(loc.x, loc.y));
+    // A settlement platform never sits below the waterline — otherwise
+    // flattening the ground floods the place it was meant to level.
+    const level = Math.max(quantise(hf.heightAt(loc.x, loc.y)), quantise(WATER_LEVEL + 22));
     platforms.push({ x: loc.x, y: loc.y, r, level, type: loc.type });
     for (let j = 0; j < hf.rows; j++) {
       for (let i = 0; i < hf.cols; i++) {

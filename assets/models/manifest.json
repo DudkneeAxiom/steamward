@@ -65,6 +65,26 @@
    "water_pump",
    "workshop_small"
   ],
+  "military": [
+   "banner_pole",
+   "barracks",
+   "barricade",
+   "broken_cart",
+   "command_tent",
+   "gatehouse",
+   "keep",
+   "palisade_segment",
+   "rubble_pile",
+   "siege_ladder",
+   "storehouse_military",
+   "tent_a",
+   "tent_b",
+   "tower_round",
+   "tower_square",
+   "wall_corner",
+   "wall_segment",
+   "weapon_rack"
+  ],
   "units": [
    "boilerlancer",
    "bowman",

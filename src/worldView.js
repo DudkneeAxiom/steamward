@@ -47,19 +47,25 @@ const LOC_PLANS = {
     ['tower_round', 0, 0, 0], ['barracks', -50, 26, 0.1], ['palisade_segment', 44, 16, 1.57],
     ['palisade_segment', 44, -44, 1.57], ['tent_a', -40, -28, 0.5],
   ],
+  // Forts and keeps are laid out programmatically from the real wall length —
+  // see enclosure() — because hand-placed offsets drift the moment an asset's
+  // dimensions change.
   fort: [
-    ['gatehouse', 0, 46, 0], ['wall_segment', -60, 46, 0], ['wall_segment', 60, 46, 0],
-    ['tower_square', -96, 46, 0], ['tower_square', 96, 46, 0],
-    ['wall_segment', -96, -14, 1.5708], ['wall_segment', 96, -14, 1.5708],
-    ['barracks', -40, -22, 0], ['storehouse_military', 44, -26, 0],
-    ['weapon_rack', 6, 6, 0.4],
+    ['barracks', -46, -26, 0], ['storehouse_military', 50, -30, 0],
+    ['weapon_rack', 4, 4, 0.4], ['tent_a', -6, -60, 0.3], ['cart', 70, 30, 0.6],
   ],
   keep: [
-    ['keep', 0, -10, 0], ['wall_segment', -70, 62, 0], ['wall_segment', -10, 62, 0],
-    ['wall_segment', 50, 62, 0], ['gatehouse', 110, 62, 0],
-    ['tower_round', -108, 58, 0], ['tower_round', 150, 30, 0],
-    ['barracks', -104, -20, 0], ['storehouse_military', 96, -30, 0], ['cart', 60, 40, 0.7],
+    ['keep', 0, -20, 0],
+    ['barracks', -132, 40, 0], ['storehouse_military', 130, 34, 0],
+    ['cart', 60, 96, 0.7], ['weapon_rack', -60, 96, 0.2],
   ],
+};
+
+// Walls that actually enclose something: segments are tiled at their true
+// length, corners get towers, and the front face opens through a gatehouse.
+const ENCLOSURES = {
+  fort: { halfW: 170, halfD: 108, gate: true },
+  keep: { halfW: 232, halfD: 168, gate: true },
 };
 
 // Fallbacks so a place is never empty if a kit asset is missing.
@@ -102,7 +108,7 @@ export class WorldView {
       roads: WORLD.roads,
       locations: campaign.locations.map(l => ({
         x: l.x, y: l.y, type: l.type,
-        platform: l.type === 'keep' ? 190 : l.type === 'fort' ? 150 : 118,
+        platform: l.type === 'keep' ? 290 : l.type === 'fort' ? 210 : 118,
       })),
     });
 
@@ -189,10 +195,45 @@ export class WorldView {
     return mats;
   }
 
+  // A run of wall segments from (x0,z0) to (x1,z1), tiled at the segment's own
+  // length so the curtain reads as one continuous mass.
+  _wallRun(parent, x0, z0, x1, z1, gapCentre) {
+    const seg = this.lib.hasProp('wall_segment') ? this.lib.propSize('wall_segment').w : 60;
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const n = Math.max(1, Math.round(len / seg));
+    const rot = -Math.atan2(z1 - z0, x1 - x0);
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      const x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+      if (gapCentre && Math.hypot(x - gapCentre.x, z - gapCentre.z) < seg * 0.8) continue;
+      this._place(parent, 'wall_segment', x, z, rot);
+    }
+  }
+
+  _buildEnclosure(parent, loc) {
+    const e = ENCLOSURES[loc.type];
+    if (!e) return;
+    const { halfW: w, halfD: d } = e;
+    const cx = loc.x, cz = loc.y;
+    const gate = e.gate ? { x: cx, z: cz + d } : null;
+    // front (toward the viewer), back, and the two flanks
+    this._wallRun(parent, cx - w, cz + d, cx + w, cz + d, gate);
+    this._wallRun(parent, cx - w, cz - d, cx + w, cz - d, null);
+    this._wallRun(parent, cx - w, cz - d, cx - w, cz + d, null);
+    this._wallRun(parent, cx + w, cz - d, cx + w, cz + d, null);
+    // corner towers, taller than the wall
+    const tower = loc.type === 'keep' ? 'tower_round' : 'tower_square';
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) this._place(parent, tower, cx + sx * w, cz + sz * d, 0);
+    }
+    if (gate) this._place(parent, 'gatehouse', gate.x, gate.z, 0);
+  }
+
   _buildLocation(parent, loc) {
     const plan = LOC_PLANS[loc.type] || [];
     const group = new THREE.Group();
     parent.add(group);
+    this._buildEnclosure(group, loc);
     for (const [asset, dx, dz, rot, scale] of plan) {
       this._place(group, asset, loc.x + dx, loc.y + dz, rot || 0, scale || 1);
     }
@@ -451,7 +492,8 @@ export class WorldView {
       disc.material.color.set(fac.color);
       disc.material.opacity = loc.owner === 'neutral' ? 0.12 : 0.34;
       disc.position.set(loc.x, this.heightAt(loc.x, loc.y) + 1.2, loc.y);
-      const r = loc.type === 'keep' ? 1.7 : loc.type === 'fort' ? 1.35 : 1;
+      // ring sits outside the walls rather than slicing through them
+      const r = loc.type === 'keep' ? 2.55 : loc.type === 'fort' ? 1.85 : 1;
       disc.scale.setScalar(r);
     }
 
