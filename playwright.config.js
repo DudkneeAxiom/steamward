@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'python3 -m http.server 8123',
+    command: 'node tools/serve.mjs',
     port: 8123,
     reuseExistingServer: true,
   },

@@ -4,7 +4,7 @@
   "description": "STEAMWARD — a browser-based 2.5D feudal-industrial strategic + tactical RTS vertical slice",
   "type": "module",
   "scripts": {
-    "serve": "python3 -m http.server 8123",
+    "serve": "node tools/serve.mjs",
     "test": "playwright test"
   },
   "devDependencies": {

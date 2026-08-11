@@ -16,12 +16,12 @@ Soldiers who die stay dead. Survivors carry their scars, experience and names.
 open it in a desktop browser:
 
 ```bash
-npm run serve          # python3 -m http.server 8123
+npm run serve          # node tools/serve.mjs — http://localhost:8123
 # then open http://localhost:8123
 ```
 
-Any static file server works (`npx serve`, nginx, …). File://` URLs will not work
-because the game uses ES modules.
+Any static file server works (`python3 -m http.server 8123`, `npx serve`,
+nginx, …). `file://` URLs will not work because the game uses ES modules.
 
 ### Campaign objective
 
