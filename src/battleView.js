@@ -147,21 +147,64 @@ export class BattleView {
       add(name, { x: c.x, y: this.heightAt(c.x, c.y), z: c.y, rot: rng.float(0, 6.28), scale });
     }
 
+    // Wall pieces are authored with their outer face (batter, loops, oversail)
+    // toward the enemy; which way that is depends on which side the defender
+    // holds, so read it off the wall rects themselves.
+    const wallXs = battle.terrain.rects.filter(r => r.kind === 'wall').map(r => r.x + r.w / 2);
+    const defenderRight = wallXs.length > 0 && wallXs[0] > W / 2;
+    const wallRot = defenderRight ? -Math.PI / 2 : Math.PI / 2;
+
     for (const r of battle.terrain.rects) {
       const cx = r.x + r.w / 2, cz = r.y + r.h / 2;
       if (r.kind === 'house') this._place(parent, rng.chance(0.5) ? 'cottage_a' : 'cottage_b', cx, cz, rng.pick([0, Math.PI / 2, Math.PI]));
       else if (r.kind === 'shed') this._place(parent, 'workshop_small', cx, cz, rng.float(0, 6.28));
       else if (r.kind === 'cart') this._place(parent, 'cart', cx, cz, rng.float(0, 6.28));
-      else if (r.kind === 'tower') this._place(parent, 'tower_square', cx, cz, 0);
+      else if (r.kind === 'tower') this._place(parent, 'tower_square', cx, cz, wallRot);
       else if (r.kind === 'wall') {
         // tile wall segments along the run so the curtain reads as one mass
         const seg = this.lib.hasProp('wall_segment') ? this.lib.propSize('wall_segment').w : 60;
         const n = Math.max(1, Math.round(r.h / seg));
         for (let i = 0; i < n; i++) {
           const z = r.y + (i + 0.5) * (r.h / n);
-          this._place(parent, 'wall_segment', cx, z, Math.PI / 2);
+          this._place(parent, 'wall_segment', cx, z, wallRot);
         }
       }
+    }
+
+    // The gate is a passage the sim keeps open, so it can't wear the gatehouse
+    // model (whose arch is a 22-unit carriageway). Instead: a tower over each
+    // blocked wall end squares off the jambs, banners fly just inside, and
+    // siege ladders lean against the outer face away from the gate lane —
+    // nothing solid-looking stands on walkable ground.
+    for (const d of (battle.terrain.decals || [])) {
+      if (d.kind !== 'gate') continue;
+      const half = (d.h || 150) / 2;
+      const ts = this.lib.hasProp('tower_square') ? this.lib.propSize('tower_square').d : 51;
+      const inw = defenderRight ? 1 : -1;
+      // One gate tower on the north jamb. At this camera anything tall south
+      // of the opening stands in front of it and visually plugs the gap, so
+      // the south jamb gets a squared wall end instead, and the garrison's
+      // colours fly inside the bailey flanking the gate road — never in the
+      // opening itself.
+      this._place(parent, 'tower_square', d.x, d.y - (half + ts / 2), wallRot);
+      this._place(parent, 'wall_corner', d.x, d.y + half + 24, wallRot);
+      for (const s of [-1, 1]) {
+        this._place(parent, 'banner_pole', d.x + inw * 70, d.y + s * 64, wallRot);
+        this._place(parent, 'siege_ladder', d.x - inw * 20, d.y + s * (half + 165), wallRot);
+      }
+    }
+
+    if (kind === 'fort' && wallXs.length > 0) {
+      // The bailey behind the wall is somebody's post, not bare turf. All of
+      // it sits in the quiet margins behind the curtain, off the gate lane.
+      const wx = wallXs[0];
+      const inw = defenderRight ? 1 : -1;
+      this._place(parent, 'tent_a', wx + inw * 96, 210, 0.35);
+      this._place(parent, 'tent_b', wx + inw * 152, 264, -0.2);
+      this._place(parent, 'weapon_rack', wx + inw * 62, 296, wallRot);
+      this._place(parent, 'cart', wx + inw * 88, H - 190, 0.8);
+      this._place(parent, 'rubble_pile', wx + inw * 54, H - 252, 0.5);
+      this._place(parent, 'tent_a', wx + inw * 142, H - 232, 2.7);
     }
 
     // Ambient scenery in the margins, away from the fighting lanes.

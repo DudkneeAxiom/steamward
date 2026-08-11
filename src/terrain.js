@@ -217,6 +217,21 @@ export function buildWorldHeightfield(spec) {
   const hf = new Heightfield(spec.w, spec.h, cell, spec.margin ?? 260);
   const noise = valueNoise2D(spec.seed ?? 1337);
   const detail = valueNoise2D((spec.seed ?? 1337) + 991);
+  // Distances to the river and the road net, kept for the re-cut pass below.
+  const riverDist = new Float32Array(hf.cols * hf.rows).fill(1e9);
+  const roadDist = new Float32Array(hf.cols * hf.rows).fill(1e9);
+  // The authored polyline stops at the map border but the ground carries on
+  // into the margin; extend the line so the river flows off the world instead
+  // of ending in a round pond at the boundary.
+  const extend = (a, b) => {
+    const d = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: b.x + (b.x - a.x) / d * 320, y: b.y + (b.y - a.y) / d * 320 };
+  };
+  const riverLine = spec.river.length > 1
+    ? [extend(spec.river[1], spec.river[0]),
+       ...spec.river,
+       extend(spec.river[spec.river.length - 2], spec.river[spec.river.length - 1])]
+    : spec.river;
 
   for (let j = 0; j < hf.rows; j++) {
     for (let i = 0; i < hf.cols; i++) {
@@ -237,7 +252,8 @@ export function buildWorldHeightfield(spec) {
       // The river cuts a valley: banks fall toward the water, bed sits below
       // it. Everywhere else is floored above the waterline, so water appears in
       // the valley and nowhere else.
-      const rd = polyDist(x, y, spec.river);
+      const rd = polyDist(x, y, riverLine);
+      riverDist[j * hf.cols + i] = rd;
       const bankW = spec.riverWidth * 2.6;
       let riverT = 0;
       if (rd < bankW) {
@@ -296,6 +312,8 @@ export function buildWorldHeightfield(spec) {
       for (let i = 0; i < hf.cols; i++) {
         const x = hf.wx(i), y = hf.wy(j);
         const d = polyDist(x, y, road);
+        const k0 = j * hf.cols + i;
+        if (d < roadDist[k0]) roadDist[k0] = d;
         if (d > 46) continue;
         const t = smoothstep(46, 16, d);
         const k = j * hf.cols + i;
@@ -310,6 +328,24 @@ export function buildWorldHeightfield(spec) {
   // Terrace it. Settlement platforms keep their exact level so buildings never
   // straddle a step.
   smoothField(hf, 5);
+
+  // The blur that widens steps into terraces also lifts this narrow channel
+  // wherever the country around it is high: the upper river dried into a chain
+  // of puddles. Re-cut the bed after smoothing so the river holds water along
+  // its whole course — through high ground it becomes a gorge, which the rock
+  // pass then paints honestly. Where a road fords the river (the north road has
+  // no bridge; crossing there is the slow way over), keep the bed just below
+  // the waterline: the river stays unbroken and the road visibly dips through
+  // the shallows rather than drowning in the channel.
+  for (let k = 0; k < hf.height.length; k++) {
+    const rd = riverDist[k];
+    if (rd >= spec.riverWidth * 1.15) continue;
+    const t = smoothstep(spec.riverWidth * 1.15, spec.riverWidth * 0.4, rd);
+    let target = hf.height[k] * (1 - t) + (WATER_LEVEL - 18) * t;
+    if (roadDist[k] < 40) target = Math.max(target, WATER_LEVEL - 3);
+    if (target < hf.height[k]) hf.height[k] = target;
+  }
+
   for (let k = 0; k < hf.height.length; k++) {
     hf.height[k] = Math.max(WATER_LEVEL - 18, quantise(hf.height[k]));
   }

@@ -43,9 +43,14 @@ const LOC_PLANS = {
     ['coal_pile', 46, -34, 0], ['pipe_run_straight', 20, 34, 0], ['pipe_run_straight', 80, 34, 0],
     ['steam_crane', -66, -30, 0.6], ['ore_cart', 70, 6, 0.3],
   ],
+  // The road runs E-W through the middle of a watch station, so everything
+  // keeps clear of that corridor; the palisade forms an L at the NE corner
+  // instead of floating across the carriageway.
   watch: [
-    ['tower_round', 0, 0, 0], ['barracks', -50, 26, 0.1], ['palisade_segment', 44, 16, 1.57],
-    ['palisade_segment', 44, -44, 1.57], ['tent_a', -40, -28, 0.5],
+    ['tower_round', 0, 0, 0], ['barracks', -50, 26, 0.1],
+    ['palisade_segment', 62, 58, 1.57], ['palisade_segment', 36, 88, 0],
+    ['banner_pole', 32, 18, 0], ['weapon_rack', 26, -34, 0.3],
+    ['tent_a', -40, -28, 0.5], ['cart', 30, -58, 0.9],
   ],
   // Forts and keeps are laid out programmatically from the real wall length —
   // see enclosure() — because hand-placed offsets drift the moment an asset's
@@ -112,7 +117,13 @@ export class WorldView {
       })),
     });
 
-    this._locPositions = campaign.locations.map(l => ({ x: l.x, y: l.y }));
+    // Walled places need a wider clearance than the radius a caller asks for:
+    // a keep's curtain reaches ~232 units out, and crops or trees inside the
+    // courtyard read as a bug, not a garden.
+    const CLEARANCE = { keep: 300, fort: 245 };
+    this._locPositions = campaign.locations.map(l => ({
+      x: l.x, y: l.y, clear: CLEARANCE[l.type] || 0,
+    }));
 
     const g = new THREE.Group();
     this.group = g;
@@ -384,11 +395,12 @@ export class WorldView {
     }
   }
 
-  // Keep scenery out of the space settlements occupy.
+  // Keep scenery out of the space settlements occupy — including the whole
+  // walled footprint of forts and keeps.
   _nearLocation(x, z, r) {
     if (!this._locPositions) return false;
     for (const p of this._locPositions) {
-      if (dist(x, z, p.x, p.y) < r) return true;
+      if (dist(x, z, p.x, p.y) < Math.max(r, p.clear)) return true;
     }
     return false;
   }
