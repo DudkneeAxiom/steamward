@@ -13,8 +13,8 @@ export const TUNE = {
   encounterRadius: 46,
   retreatCooldown: 14,       // seconds an army ignores the enemy it fled from
   // battle
-  battleW: 1560,             // tight enough that both lines read on one screen
-  battleH: 1080,
+  battleW: 1120,             // tight enough that both lines read on one screen
+  battleH: 780,
   cell: 30,                  // pathfinding grid cell size
   vetBattles: 3,
   xpKill: 8,
@@ -136,6 +136,21 @@ export const LOC_TYPES = {
     production: { crowns: 3, provisions: 2 }, recruits: ['levy', 'spearman', 'bowman'],
     garrisonCap: 20, defense: 1.8, sight: 380,
   },
+};
+
+// Physical size of battlefield obstacles, in world units (1 unit = 10cm).
+// The simulation owns these; the renderer scales its models to match, so what
+// blocks a soldier is always what the player can see.
+export const OBSTACLE = {
+  tree: { r: 11 },
+  rock: { r: 10 },
+  boiler: { r: 13 },
+  spoil: { r: 11 },
+  house: { w: 62, d: 52 },
+  shed: { w: 52, d: 34 },
+  cart: { w: 42, d: 22 },
+  wall: { thickness: 26, segment: 60 },
+  tower: { size: 46 },
 };
 
 // Battle terrain contexts keyed from strategic surroundings.

@@ -1,9 +1,8 @@
 // Tactical battle simulation. Real soldiers from the strategic layer fight here;
 // the result flows back as persistent casualties, experience and territory.
 
-import { TUNE, UNIT_TYPES } from './data.js';
+import { TUNE, UNIT_TYPES, OBSTACLE } from './data.js';
 import { fitForDuty, isVeteran } from './soldiers.js';
-import { propSize } from './sprites.js';
 import { clamp, dist, dist2, makeRng, angleLerp } from './util.js';
 
 const W = TUNE.battleW, H = TUNE.battleH, CELL = TUNE.cell;
@@ -16,18 +15,14 @@ function genTerrain(kind, rng, defendingSide) {
   // zones (no blocking). Blocking sizes come from the sprites' own footprints
   // so what you see is what units actually collide with.
   const circles = [], rects = [], hills = [], decals = [];
-  const foot = (name, frac) => Math.max(6, propSize(name).w * frac / 2);
-  const tree = (x, y) => {
-    const sprite = rng.chance(0.5) ? 'tree_pine' : 'tree_round';
-    circles.push({ x, y, r: foot(sprite, 0.62), kind: 'tree', sprite });
-  };
-  const rock = (x, y) => circles.push({ x, y, r: foot('rock', 0.8), kind: 'rock', sprite: 'rock' });
+  const tree = (x, y) => circles.push({ x, y, r: OBSTACLE.tree.r * rng.float(0.85, 1.25), kind: 'tree' });
+  const rock = (x, y) => circles.push({ x, y, r: OBSTACLE.rock.r * rng.float(0.8, 1.3), kind: 'rock' });
 
   const scatter = (n, fn, minX = 120, maxX = W - 120) => {
     for (let i = 0; i < n; i++) {
       const x = rng.float(minX, maxX), y = rng.float(100, H - 100);
       // keep deployment lanes clear
-      if (x < 420 || x > W - 420) continue;
+      if (x < W * 0.27 || x > W - W * 0.27) continue;
       fn(x, y);
     }
   };
@@ -49,33 +44,31 @@ function genTerrain(kind, rng, defendingSide) {
     scatter(8, tree, 120, rx - 200); scatter(8, tree, rx + 200, W - 120);
   } else if (kind === 'settlement') {
     const lanes = [H * 0.32, H * 0.55, H * 0.78];
-    const hs = propSize('house');
     for (let i = 0; i < 7; i++) {
       const x = rng.float(W * 0.3, W * 0.68), y = rng.pick(lanes) + rng.float(-140, -60);
-      rects.push({ x, y, w: hs.w * 0.86, h: hs.d * 0.8, kind: 'house', sprite: 'house' });
+      rects.push({ x, y, w: OBSTACLE.house.w, h: OBSTACLE.house.d, kind: 'house' });
     }
     scatter(6, tree);
     for (let i = 0; i < 6; i++) decals.push({ x: rng.float(W * 0.25, W * 0.75), y: rng.float(150, H - 150), kind: 'fence' });
   } else if (kind === 'industrial') {
-    const bs = propSize('boiler'), ss = propSize('shed'), cs = propSize('cart');
     for (let i = 0; i < 5; i++) {
-      circles.push({ x: rng.float(W * 0.32, W * 0.68), y: rng.float(200, H - 200), r: bs.w * 0.5, kind: 'boiler', sprite: 'boiler' });
+      circles.push({ x: rng.float(W * 0.32, W * 0.68), y: rng.float(200, H - 200), r: OBSTACLE.boiler.r, kind: 'boiler' });
     }
     for (let i = 0; i < 4; i++) {
-      rects.push({ x: rng.float(W * 0.3, W * 0.66), y: rng.float(180, H - 240), w: ss.w * 0.9, h: ss.d * 0.8, kind: 'shed', sprite: 'shed' });
+      rects.push({ x: rng.float(W * 0.3, W * 0.66), y: rng.float(180, H - 240), w: OBSTACLE.shed.w, h: OBSTACLE.shed.d, kind: 'shed' });
     }
     for (let i = 0; i < 5; i++) {
-      rects.push({ x: rng.float(W * 0.28, W * 0.7), y: rng.float(160, H - 200), w: cs.w * 0.85, h: cs.d * 0.7, kind: 'cart', sprite: 'cart' });
+      rects.push({ x: rng.float(W * 0.28, W * 0.7), y: rng.float(160, H - 200), w: OBSTACLE.cart.w, h: OBSTACLE.cart.d, kind: 'cart' });
     }
     for (let i = 0; i < 8; i++) {
-      circles.push({ x: rng.float(W * 0.3, W * 0.7), y: rng.float(150, H - 150), r: propSize('spoil').w * 0.42, kind: 'spoil', sprite: 'spoil' });
+      circles.push({ x: rng.float(W * 0.3, W * 0.7), y: rng.float(150, H - 150), r: OBSTACLE.spoil.r, kind: 'spoil' });
     }
   } else if (kind === 'fort') {
     // Defender holds a walled position on their side with a gate gap.
     const wx = defendingSide === 'right' ? W * 0.62 : W * 0.38;
     const gateY = H / 2, gateH = 150;
-    const ws = propSize('wall'), ts = propSize('tower');
-    const wt = ws.d * 0.9;
+    const wt = OBSTACLE.wall.thickness;
+    const ts = { d: OBSTACLE.tower.size };
     rects.push({ x: wx - wt / 2, y: 120, w: wt, h: gateY - gateH / 2 - 120, kind: 'wall' });
     rects.push({ x: wx - wt / 2, y: gateY + gateH / 2, w: wt, h: H - 120 - (gateY + gateH / 2), kind: 'wall' });
     rects.push({ x: wx - ts.d / 2, y: 80 - ts.d / 2, w: ts.d, h: ts.d, kind: 'tower' });

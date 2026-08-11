@@ -6,25 +6,22 @@ import { makeRng, dist, clamp } from './util.js';
 import * as Campaign from './campaign.js';
 import * as Strategic from './strategic.js';
 import * as Battle from './battle.js';
-import { renderStrategic } from './strategicRender.js';
-import { renderBattle, consumeEffects, resetBattleFx } from './battleRender.js';
+import { Gfx } from './gfx.js';
+import { AssetLibrary } from './models.js';
+import { WorldView } from './worldView.js';
+import { BattleView } from './battleView.js';
 import * as UI from './ui.js';
 import { initAudio, resumeAudio, sfx, consumeEffectsAudio, toggleMusic } from './audio.js';
-import { makeCamera } from './camera.js';
 import { fitForDuty, promotionOptions, isVeteran } from './soldiers.js';
-import { loadSprites } from './sprites.js';
 
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-let dpr = 1;
+const gfx = new Gfx(canvas);
+const assets = new AssetLibrary();
+const worldView = new WorldView(gfx, assets);
+const battleView = new BattleView(gfx, assets);
+const dpr = 1;                       // input is in CSS pixels now
 
-function resize() {
-  dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  canvas.width = Math.floor(canvas.clientWidth * dpr);
-  canvas.height = Math.floor(canvas.clientHeight * dpr);
-}
-window.addEventListener('resize', resize);
-resize();
+window.addEventListener('resize', () => gfx.resize());
 
 // ---------------------------------------------------------------- state
 
@@ -33,7 +30,6 @@ let campaign = null;
 let battle = null;
 let battleMeta = null;
 let rng = makeRng((Math.random() * 1e9) | 0);
-const cam = makeCamera(canvas);
 let stratCamSaved = null;
 
 const keys = {};
@@ -118,35 +114,37 @@ UI.initUI(api);
 function enterStrategic(centerOnArmy) {
   mode = 'strategic';
   battle = null; battleMeta = null;
-  cam.bounds = { w: Campaign.WORLD.w, h: Campaign.WORLD.h };
-  if (stratCamSaved) {
-    cam.x = stratCamSaved.x; cam.y = stratCamSaved.y; cam.zoom = stratCamSaved.zoom;
-  }
+  battleView.dispose();
+  worldView.build(campaign);
   const pa = Campaign.playerArmy(campaign);
-  if (centerOnArmy && pa) { cam.centerOn(pa.x, pa.y); cam.zoom = 1; }
+  if (stratCamSaved && !centerOnArmy) {
+    gfx.viewHeight = stratCamSaved.viewHeight;
+    gfx.centerOn(stratCamSaved.x, stratCamSaved.y);
+  } else if (pa) {
+    gfx.viewHeight = 1000;
+    gfx.centerOn(pa.x, pa.y);
+  }
   selectedArmy = pa;
   UI.setScreen('strategic');
   UI.setSpeedButtons(campaign.speed);
 }
 
 function enterBattle(bctx, meta) {
-  stratCamSaved = { x: cam.x, y: cam.y, zoom: cam.zoom };
+  stratCamSaved = { x: gfx.target.x, y: gfx.target.z, viewHeight: gfx.viewHeight };
   battle = Battle.startBattle(bctx);
   battleMeta = meta;
   resultShown = false;
-  resetBattleFx();
+  worldView.dispose();
+  battleView.build(battle);
   mode = 'battle';
-  cam.bounds = { w: battle.w, h: battle.h };
   // Open on a frame that holds both battle lines: the player should read the
-  // whole tactical problem before giving the first order.
+  // whole tactical problem before giving the first order, without zooming so
+  // far out that soldiers stop being readable.
   const xs = battle.units.map(u => u.x), ys = battle.units.map(u => u.y);
-  const minX = Math.min(...xs) - 160, maxX = Math.max(...xs) + 160;
-  const minY = Math.min(...ys) - 120, maxY = Math.max(...ys) + 120;
-  const fit = Math.min(canvas.width / (maxX - minX), canvas.height / ((maxY - minY) * 0.68));
-  // Never zoom out so far that soldiers stop being readable, even if that
-  // means the far flank starts just off screen.
-  cam.zoom = clamp(fit, 0.78, 1.15);
-  cam.centerOn((minX + maxX) / 2, (minY + maxY) / 2);
+  const spanX = (Math.max(...xs) - Math.min(...xs)) + 340;
+  const spanY = (Math.max(...ys) - Math.min(...ys)) + 260;
+  gfx.viewHeight = clamp(Math.max(spanY, spanX / Math.max(0.6, gfx.aspect)), 430, 780);
+  gfx.centerOn((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2);
   UI.setScreen('battle');
   UI.updateTutor(campaign, 'battle');
 }
@@ -388,7 +386,14 @@ function collectBattleSoldiers(player) {
 
 function screenMouse(e) {
   const r = canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr };
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+// Screen point -> simulation coordinates, by raycasting the real ground so a
+// click on a hillside lands where the player is looking.
+function groundAt(px, py) {
+  const p = gfx.screenToGround(px, py);
+  return p ? { x: p.x, y: p.z } : null;
 }
 
 canvas.addEventListener('mousedown', (e) => {
@@ -404,7 +409,7 @@ canvas.addEventListener('mousedown', (e) => {
 canvas.addEventListener('mousemove', (e) => {
   const m = screenMouse(e);
   if (mouse.mmb) {
-    cam.pan((mouse.x - m.x), (mouse.y - m.y));
+    gfx.pan((mouse.x - m.x), (mouse.y - m.y));
   }
   if (mouse.down && dist(m.x, m.y, mouse.downX, mouse.downY) > 6 * dpr) {
     mouse.dragging = true;
@@ -427,9 +432,16 @@ window.addEventListener('mouseup', (e) => {
     if (!wasDragging) strategicLeftClick();
   } else if (mode === 'battle') {
     if (wasDragging && boxSel) {
-      const a = cam.toWorld(boxSel.x0, boxSel.y0);
-      const b = cam.toWorld(boxSel.x1, boxSel.y1);
-      Battle.selectBox(battle, a.x, a.y, b.x, b.y, keys['shift']);
+      // Box select in screen space: project each unit and test the rectangle,
+      // which is what the player actually drew.
+      const x0 = Math.min(boxSel.x0, boxSel.x1), x1 = Math.max(boxSel.x0, boxSel.x1);
+      const y0 = Math.min(boxSel.y0, boxSel.y1), y1 = Math.max(boxSel.y0, boxSel.y1);
+      if (!keys['shift']) battle.selection.clear();
+      for (const u of Battle.aliveUnits(battle, true)) {
+        if (u.state === 'routing') continue;
+        const s = gfx.worldToScreen(u.x, battleView.heightAt(u.x, u.y) + 9, u.y);
+        if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1) battle.selection.add(u.uid);
+      }
       if (battle.selection.size > 0) sfx('click');
     } else if (!wasDragging) {
       battleLeftClick();
@@ -443,7 +455,8 @@ canvas.addEventListener('contextmenu', (e) => {
   initAudio(); resumeAudio();
   if (UI.isDialogOpen()) return;
   const m = screenMouse(e);
-  const w = cam.toWorld(m.x, m.y);
+  const w = groundAt(m.x, m.y);
+  if (!w) return;
   if (mode === 'strategic') strategicRightClick(w);
   else if (mode === 'battle') battleRightClick(w);
 });
@@ -451,7 +464,7 @@ canvas.addEventListener('contextmenu', (e) => {
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const m = screenMouse(e);
-  cam.zoomAt(m.x, m.y, e.deltaY < 0 ? 1.12 : 0.89);
+  gfx.zoomBy(e.deltaY < 0 ? 1.14 : 0.88, m.x, m.y);
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
@@ -497,6 +510,20 @@ window.addEventListener('keyup', (e) => {
   if (k === 'a') attackArmed = false;
 });
 
+// Pick the soldier nearest the cursor in screen space — with real 3D depth a
+// tall unit's body may be well above its ground position.
+function pickUnit(px, py) {
+  if (!battle) return null;
+  let best = null, bd = 26 * 26;
+  for (const u of battle.units) {
+    if (u.state === 'dead' || u.state === 'fled') continue;
+    const s = gfx.worldToScreen(u.x, battleView.heightAt(u.x, u.y) + 10, u.y);
+    const d = (s.x - px) * (s.x - px) + (s.y - py) * (s.y - py);
+    if (d < bd) { bd = d; best = u; }
+  }
+  return best;
+}
+
 function heroSolo() {
   if (!battle) return false;
   const h = Battle.heroUnit(battle);
@@ -508,12 +535,13 @@ function selectHeroAndCenter() {
   if (!h || h.state === 'dead') return;
   battle.selection.clear();
   battle.selection.add(h.uid);
-  cam.centerOn(h.x, h.y);
+  gfx.centerOn(h.x, h.y);
   sfx('click');
 }
 
 function strategicLeftClick() {
-  const w = cam.toWorld(mouse.x, mouse.y);
+  const w = groundAt(mouse.x, mouse.y);
+  if (!w) return;
   const pa = Campaign.playerArmy(campaign);
   if (pa && dist(w.x, w.y, pa.x, pa.y) < 40) {
     selectedArmy = pa;
@@ -522,7 +550,7 @@ function strategicLeftClick() {
   }
   // clicking a location centers the view on it
   for (const loc of campaign.locations) {
-    if (dist(w.x, w.y, loc.x, loc.y) < 55) { cam.centerOn(loc.x, loc.y); return; }
+    if (dist(w.x, w.y, loc.x, loc.y) < 90) { gfx.centerOn(loc.x, loc.y); return; }
   }
   selectedArmy = pa; // player army stays selected; there is only one field army
 }
@@ -541,16 +569,17 @@ function strategicRightClick(w) {
 }
 
 function battleLeftClick() {
-  const w = cam.toWorld(mouse.x, mouse.y);
+  const w = groundAt(mouse.x, mouse.y);
+  if (!w) return;
   if (attackArmed) {
-    const t = Battle.unitAt(battle, w.x, w.y, 16);
+    const t = pickUnit(mouse.x, mouse.y) || Battle.unitAt(battle, w.x, w.y, 22);
     if (t && !t.player) Battle.commandAttack(battle, t);
     else Battle.commandMove(battle, w.x, w.y, true);
     attackArmed = false;
     sfx('order');
     return;
   }
-  const u = Battle.unitAt(battle, w.x, w.y, 16);
+  const u = pickUnit(mouse.x, mouse.y) || Battle.unitAt(battle, w.x, w.y, 22);
   const now = performance.now();
   if (u && u.player) {
     if (now - lastClickT < 350 && lastClickUid === u.uid) {
@@ -566,7 +595,7 @@ function battleLeftClick() {
 }
 
 function battleRightClick(w) {
-  const t = Battle.unitAt(battle, w.x, w.y, 16);
+  const t = pickUnit(mouse.x, mouse.y) || Battle.unitAt(battle, w.x, w.y, 22);
   if (t && !t.player) {
     if (Battle.commandAttack(battle, t)) sfx('order');
   } else {
@@ -577,8 +606,8 @@ function battleRightClick(w) {
 // ---------------------------------------------------------------- camera panning
 
 function updateCamera(dt) {
-  const pan = 520 * dt * dpr;
-  const edge = 14 * dpr;
+  const pan = 520 * dt * (gfx.viewHeight / 900);
+  const edge = 14;
   let dx = 0, dy = 0;
   if (keys['arrowleft']) dx -= pan;
   if (keys['arrowright']) dx += pan;
@@ -595,18 +624,24 @@ function updateCamera(dt) {
   // edge pan (only when the window has focus and mouse is inside)
   if (mouse.x > 0 && mouse.y > 0) {
     if (mouse.x < edge) dx -= pan;
-    if (mouse.x > canvas.width - edge) dx += pan;
-    if (mouse.y < edge && mouse.y > 44 * dpr) dy -= pan;
-    if (mouse.y > canvas.height - edge) dy += pan;
+    if (mouse.x > canvas.clientWidth - edge) dx += pan;
+    if (mouse.y < edge && mouse.y > 44) dy -= pan;
+    if (mouse.y > canvas.clientHeight - edge) dy += pan;
   }
-  if (dx || dy) cam.pan(dx, dy);
+  if (dx || dy) gfx.pan(dx, dy);
 }
 
 // ---------------------------------------------------------------- main loop
 
 let lastT = performance.now();
+const SIM_STEP = 1 / 30;          // fixed tactical timestep
+let simAcc = 0;
+
 function frame(now) {
-  const rawDt = Math.min(0.05, (now - lastT) / 1000);
+  // Wall-clock time drives the world, not frame rate: on a slow machine the
+  // campaign must not run in slow motion. Battles are stepped at a fixed rate
+  // so movement and collision stay stable however long a frame took.
+  const rawDt = Math.min(0.25, (now - lastT) / 1000);
   lastT = now;
   fpsAcc += rawDt; fpsN++;
   if (fpsAcc > 0.5) { fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
@@ -636,18 +671,28 @@ function frame(now) {
         if (dist(pa.x, pa.y, loc.x, loc.y) < 90) { nearbyLoc = loc; break; }
       }
     }
-    renderStrategic(ctx, cam, campaign, selectedArmy, time);
+    worldView.update(campaign, selectedArmy, time);
+    gfx.render();
+    UI.updateWorldLabels(campaign, gfx, worldView);
     UI.updateTopbar(campaign);
     UI.drainAlerts(campaign);
     UI.updateContextPanel(campaign, selectedArmy, nearbyLoc);
     UI.updateTutor(campaign, 'strategic');
   } else if (mode === 'battle' && battle) {
     updateCamera(rawDt);
-    if (!UI.isDialogOpen()) Battle.updateBattle(battle, rawDt, keys);
-    consumeEffects(battle);
+    if (!UI.isDialogOpen()) {
+      simAcc = Math.min(simAcc + rawDt, SIM_STEP * 8);
+      while (simAcc >= SIM_STEP) {
+        Battle.updateBattle(battle, SIM_STEP, keys);
+        simAcc -= SIM_STEP;
+      }
+    }
+    battleView.consumeEffects(battle);
     consumeEffectsAudio(battle.effects);
     battle.effects.length = 0;
-    renderBattle(ctx, cam, battle, rawDt, time, boxSel);
+    battleView.update(battle, rawDt, time);
+    gfx.render();
+    UI.updateSelectionBox(boxSel);
     UI.updateBattleHud(battle, Battle.aliveUnits(battle, true).length, Battle.aliveUnits(battle, false).length, Battle.selectedUnits(battle));
     if (battle.state === 'ended' && !resultShown) {
       resultShown = true;
@@ -690,8 +735,9 @@ window.SW = {
   get mode() { return mode; },
   get campaign() { return campaign; },
   get battle() { return battle; },
-  get cam() { return cam; },
-  get dpr() { return dpr; },
+  get gfx() { return gfx; },
+  get view() { return mode === 'battle' ? battleView : worldView; },
+  get dpr() { return 1; },
   api,
   Campaign, Battle, Strategic, UI, UNIT_TYPES,
   giveResources(crowns = 200, provisions = 50, coal = 50) {
@@ -734,12 +780,12 @@ window.SW = {
 
 UI.setScreen('menu', Campaign.hasSave());
 UI.setBooting(true);
-loadSprites()
+assets.load('assets/models/manifest.json', ['player', 'falkmoor', 'brennan', 'bandit', 'neutral'])
   .catch(err => {
-    // The game still plays with placeholder figures rather than not at all.
-    console.error('sprite atlases failed to load', err);
+    console.error('asset library failed to load', err);
   })
   .finally(() => {
+    if (assets.missing.size) console.warn('missing assets:', [...assets.missing].join(', '));
     UI.setBooting(false);
     requestAnimationFrame(frame);
   });

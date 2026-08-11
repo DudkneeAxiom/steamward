@@ -1,0 +1,57 @@
+{
+ "categories": {
+  "scenery": [
+   "boiler_large",
+   "bush_a",
+   "cart",
+   "cottage_a",
+   "rock_a",
+   "tent_a",
+   "tower_round",
+   "tree_broad_a",
+   "tree_pine_a",
+   "wall_segment"
+  ],
+  "settlement": [
+   "cart",
+   "cottage_a",
+   "cottage_b",
+   "cottage_c",
+   "crop_row",
+   "fence_corner",
+   "fence_segment",
+   "haystack",
+   "log_pile",
+   "longhouse",
+   "market_stall",
+   "storehouse",
+   "watchtower_small",
+   "well"
+  ],
+  "industrial": [
+   "boiler_large",
+   "boiler_small",
+   "chimney_stack",
+   "coal_hopper",
+   "coal_pile",
+   "foundry_hall",
+   "mine_headframe",
+   "ore_cart",
+   "pipe_run_corner",
+   "pipe_run_straight",
+   "steam_crane",
+   "water_pump",
+   "workshop_small"
+  ],
+  "units": [
+   "boilerlancer",
+   "bowman",
+   "hero",
+   "levy",
+   "pressurebow",
+   "rider",
+   "shieldman",
+   "spearman"
+  ]
+ }
+}

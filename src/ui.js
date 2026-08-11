@@ -47,6 +47,11 @@ export function setScreen(screen, hasSaveFile) {
   // Campaign clock controls have no meaning inside a battle — don't show dead buttons.
   $('time-controls').classList.toggle('hidden', screen !== 'strategic');
   if (screen !== 'strategic') $('context-panel').classList.add('hidden');
+  const labels = $('world-labels');
+  if (labels) labels.classList.toggle('hidden', screen !== 'strategic');
+  if (screen !== 'strategic') clearWorldLabels();
+  const sel = $('selbox');
+  if (sel && screen !== 'battle') sel.classList.add('hidden');
   if (screen === 'menu') {
     $('btn-continue').classList.toggle('hidden', !hasSaveFile);
     $('btn-reset').classList.toggle('hidden', !hasSaveFile);
@@ -114,6 +119,67 @@ export function drainAlerts(c) {
     else if (a.kind === 'good') sfx('capture');
   }
   c.alerts.length = 0;
+}
+
+// ---------------------------------------------------------------- world labels
+//
+// Place names and garrison counts live in the DOM and are pinned to projected
+// world points each frame. Text belongs to the interface; the world itself is
+// geometry.
+
+const labelEls = new Map();
+
+export function updateWorldLabels(c, gfx, view) {
+  const root = $('world-labels');
+  if (!root) return;
+  for (const loc of c.locations) {
+    let el = labelEls.get(loc.key);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wlabel';
+      el.innerHTML = '<span class="wl-name"></span><span class="wl-gar"></span>';
+      root.appendChild(el);
+      labelEls.set(loc.key, el);
+    }
+    const h = view.heightAt ? view.heightAt(loc.x, loc.y) : 0;
+    const p = gfx.worldToScreen(loc.x, h + 8, loc.y);
+    const onScreen = p.depth > -1 && p.depth < 1 &&
+      p.x > -160 && p.y > -60 && p.x < root.clientWidth + 160 && p.y < root.clientHeight + 60;
+    el.style.display = onScreen ? 'block' : 'none';
+    if (!onScreen) continue;
+    el.style.transform = `translate(-50%, 0) translate(${p.x}px, ${p.y}px)`;
+    const fac = FACTIONS[loc.owner] || FACTIONS.neutral;
+    const g = fitForDuty(loc.garrison).length;
+    const sig = `${loc.owner}|${g}`;
+    if (el.dataset.sig !== sig) {
+      el.dataset.sig = sig;
+      el.querySelector('.wl-name').textContent = loc.name;
+      el.querySelector('.wl-name').style.color = loc.owner === 'player' ? '#cfe3c2' : '#ded7c6';
+      const gar = el.querySelector('.wl-gar');
+      gar.textContent = g > 0 ? `⛨ ${g}` : '';
+      gar.style.color = fac.color;
+      el.style.borderBottomColor = fac.color;
+    }
+  }
+}
+
+export function clearWorldLabels() {
+  const root = $('world-labels');
+  if (root) root.innerHTML = '';
+  labelEls.clear();
+}
+
+// The battle drag-select rectangle, drawn over the WebGL canvas.
+export function updateSelectionBox(box) {
+  const el = $('selbox');
+  if (!el) return;
+  if (!box) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const x = Math.min(box.x0, box.x1), y = Math.min(box.y0, box.y1);
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.width = `${Math.abs(box.x1 - box.x0)}px`;
+  el.style.height = `${Math.abs(box.y1 - box.y0)}px`;
 }
 
 // ---------------------------------------------------------------- tutorial

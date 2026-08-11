@@ -8,8 +8,8 @@ test.describe.configure({ mode: 'serial' });
 // World-space point → CSS-pixel screen point for real mouse input.
 async function screenOf(page, wx, wy) {
   return page.evaluate(([x, y]) => {
-    const p = window.SW.cam.toScreen(x, y);
-    return { x: p.x / window.SW.dpr, y: p.y / window.SW.dpr };
+    const h = window.SW.view.heightAt ? window.SW.view.heightAt(x, y) : 0;
+    return window.SW.gfx.worldToScreen(x, h, y);
   }, [wx, wy]);
 }
 
@@ -117,13 +117,16 @@ test('complete campaign acceptance loop', async ({ page }) => {
 
   // -------- box-select soldiers (real drag over own deployment)
   const bbox = await page.evaluate(() => {
-    const b = window.SW.battle;
+    const b = window.SW.battle, g = window.SW.gfx, v = window.SW.view;
     const mine = b.units.filter(u => u.player);
-    const xs = mine.map(u => u.x), ys = mine.map(u => u.y);
-    const a = window.SW.cam.toScreen(Math.min(...xs) - 40, Math.min(...ys) - 40);
-    const c = window.SW.cam.toScreen(Math.max(...xs) + 40, Math.max(...ys) + 40);
-    const d = window.SW.dpr;
-    return { x0: a.x / d, y0: a.y / d, x1: c.x / d, y1: c.y / d };
+    // project every soldier and take the screen-space bounds, padded
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const u of mine) {
+      const p = g.worldToScreen(u.x, v.heightAt(u.x, u.y) + 10, u.y);
+      x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x);
+      y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+    }
+    return { x0: x0 - 40, y0: y0 - 40, x1: x1 + 40, y1: y1 + 40 };
   });
   await page.mouse.move(bbox.x0, bbox.y0);
   await page.mouse.down();
@@ -134,13 +137,12 @@ test('complete campaign acceptance loop', async ({ page }) => {
 
   // -------- issue a move command (right-click open ground)
   const mid = await page.evaluate(() => {
-    const b = window.SW.battle;
+    const b = window.SW.battle, g = window.SW.gfx, v = window.SW.view;
     const mine = b.units.filter(u => u.player);
-    const mx = mine.reduce((s, u) => s + u.x, 0) / mine.length;
+    const mx = mine.reduce((s, u) => s + u.x, 0) / mine.length + 110;
     const my = mine.reduce((s, u) => s + u.y, 0) / mine.length;
-    const p = window.SW.cam.toScreen(mx + 120, my);
-    const d = window.SW.dpr;
-    return { x: p.x / d, y: p.y / d };
+    const p = g.worldToScreen(mx, v.heightAt(mx, my), my);
+    return { x: p.x, y: p.y };
   });
   await page.mouse.click(mid.x, mid.y, { button: 'right' });
   const hasOrder = await page.evaluate(() => {
@@ -152,11 +154,10 @@ test('complete campaign acceptance loop', async ({ page }) => {
   // -------- issue an attack command (right-click an enemy)
   await page.waitForTimeout(800);
   const foe = await page.evaluate(() => {
-    const b = window.SW.battle;
+    const b = window.SW.battle, g = window.SW.gfx, v = window.SW.view;
     const e = b.units.find(u => !u.player && u.state !== 'dead' && u.state !== 'fled');
-    const p = window.SW.cam.toScreen(e.x, e.y);
-    const d = window.SW.dpr;
-    return { x: p.x / d, y: p.y / d, uid: e.uid };
+    const p = g.worldToScreen(e.x, v.heightAt(e.x, e.y) + 10, e.y);
+    return { x: p.x, y: p.y, uid: e.uid };
   });
   // enemy may be off screen; command through the API is equivalent if so
   const vp = page.viewportSize();
