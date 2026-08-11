@@ -12,6 +12,7 @@ import { UnitRenderer } from './unitView.js';
 import { WORLD, isSpotted, byKey } from './campaign.js';
 import { LOC_TYPES, FACTIONS } from './data.js';
 import { makeRng, dist } from './util.js';
+import { BIOME } from './terrain.js';
 import { fitForDuty } from './soldiers.js';
 
 // How each kind of place is built out of the settlement/military/industrial
@@ -95,7 +96,7 @@ export class WorldView {
 
     this.hf = buildWorldHeightfield({
       w: WORLD.w, h: WORLD.h, cell: 26, seed: 20260811,
-      hills: WORLD.hills.map(h => ({ ...h, height: h.height || 150 })),
+      hills: WORLD.hills.map(h => ({ ...h, r: h.r * 1.9, height: h.height || 108 })),
       forests: WORLD.forests, farms: WORLD.farms,
       river: WORLD.river, riverWidth: WORLD.riverWidth,
       roads: WORLD.roads,
@@ -268,20 +269,34 @@ export class WorldView {
       }
     }
 
-    // Rocky ground on the steep parts of the highlands.
+    // Rocky ground on the steep parts of the highlands: boulders on the slopes,
+    // outcrops on the crests, so exposed stone is a physical thing rather than
+    // a grey patch of ground colour.
+    const outcrops = ['rock_outcrop', 'cliff_face_segment'].filter(n => this.lib.hasProp(n));
     for (const h of WORLD.hills) {
-      const n = Math.floor(h.r / 9);
+      const n = Math.floor(h.r / 4.5);
       for (let i = 0; i < n; i++) {
-        const a = rng.float(0, Math.PI * 2), d = Math.sqrt(rng.float(0, 1)) * h.r;
+        const a = rng.float(0, Math.PI * 2), d = Math.sqrt(rng.float(0, 1)) * h.r * 1.05;
         const x = h.x + Math.cos(a) * d, z = h.y + Math.sin(a) * d;
         if (x < 20 || z < 20 || x > WORLD.w - 20 || z > WORLD.h - 20) continue;
         if (this._nearLocation(x, z, 140)) continue;
         const slope = this.hf.slopeAt(x, z);
-        if (slope < 0.12 && rng.chance(0.7)) continue;
-        add(rng.pick(rockNames), {
+        const rocky = this.hf.biomeAt(x, z) === BIOME.rock;
+        if (!rocky && slope < 0.1 && rng.chance(0.75)) continue;
+        const useOutcrop = outcrops.length > 0 && (slope > 0.22 || rocky) && rng.chance(0.3);
+        add(useOutcrop ? rng.pick(outcrops) : rng.pick(rockNames), {
           x, y: this.heightAt(x, z), z,
-          rot: rng.float(0, Math.PI * 2), scale: rng.float(0.7, 1.6),
+          rot: rng.float(0, Math.PI * 2),
+          scale: useOutcrop ? rng.float(0.9, 1.5) : rng.float(0.6, 1.7),
         });
+      }
+      // a few dead trees and stumps where the ground turns to stone
+      for (let i = 0; i < n / 6; i++) {
+        const a = rng.float(0, Math.PI * 2), d = Math.sqrt(rng.float(0, 1)) * h.r;
+        const x = h.x + Math.cos(a) * d, z = h.y + Math.sin(a) * d;
+        if (this._nearLocation(x, z, 140)) continue;
+        add(rng.chance(0.5) ? 'tree_dead' : 'stump',
+          { x, y: this.heightAt(x, z), z, rot: rng.float(0, 6.28), scale: rng.float(0.8, 1.2) });
       }
     }
 

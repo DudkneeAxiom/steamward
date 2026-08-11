@@ -12,6 +12,28 @@
    "tree_pine_a",
    "wall_segment"
   ],
+  "nature": [
+   "bush_a",
+   "bush_b",
+   "cliff_face_segment",
+   "fallen_tree",
+   "grass_tuft",
+   "log",
+   "reeds",
+   "rock_a",
+   "rock_b",
+   "rock_c",
+   "rock_outcrop",
+   "sapling",
+   "stump",
+   "tree_broad_a",
+   "tree_broad_b",
+   "tree_broad_c",
+   "tree_dead",
+   "tree_pine_a",
+   "tree_pine_b",
+   "tree_pine_c"
+  ],
   "settlement": [
    "cart",
    "cottage_a",

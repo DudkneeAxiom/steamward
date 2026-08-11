@@ -12,7 +12,7 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, makeRng, segDist } from './util.js';
 
-export const STEP = 12;            // vertical quantisation — terrace thickness
+export const STEP = 9;             // vertical quantisation — terrace thickness
 export const WATER_LEVEL = 6;
 
 // Ground materials, indexed by the mesher. Colour is picked per cell from the
@@ -40,10 +40,13 @@ const CLIFF_ROCK = [0.42, 0.41, 0.38];
 // as washed-out beige instead of earth.
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const toLinear = (rgb) => [srgbToLinear(rgb[0]), srgbToLinear(rgb[1]), srgbToLinear(rgb[2])];
+// A shallow step is a fold in the ground: lighting already darkens a vertical
+// face, and darkening its colour as well turned every slope into a
+// checkerboard. Only a real drop shows bare rock.
 const cliffColor = (baseLinear, steps) => {
   if (steps >= 3) return toLinear(CLIFF_ROCK);
-  const k = steps >= 2 ? 0.55 : 0.72;
-  return [baseLinear[0] * k, baseLinear[1] * k, baseLinear[2] * k];
+  if (steps >= 2) return [baseLinear[0] * 0.85, baseLinear[1] * 0.85, baseLinear[2] * 0.85];
+  return baseLinear;
 };
 
 // ---------------------------------------------------------------- noise
@@ -101,9 +104,10 @@ export class Heightfield {
     this.rows = Math.ceil((h + margin * 2) / cell) + 1;
     this.height = new Float32Array(this.cols * this.rows);
     this.biome = new Uint8Array(this.cols * this.rows);
-    // 0..1 industrial staining, blended in the mesher so a works site darkens
-    // its ground smoothly instead of switching cell by cell
+    // 0..1 fields blended in the mesher, so a works site or an outcrop shades
+    // smoothly instead of switching cell by cell
     this.stain = new Float32Array(this.cols * this.rows);
+    this.rock = new Float32Array(this.cols * this.rows);
   }
   // world position of grid sample (i, j)
   wx(i) { return this.ox + i * this.cell; }
@@ -140,6 +144,28 @@ const quantise = (h) => Math.round(h / STEP) * STEP;
  * land on different steps almost everywhere and the map becomes a staircase of
  * thin cliff faces instead of broad terraces with occasional real drops.
  */
+/** Blur an arbitrary per-cell field (rockiness, staining). */
+function blurField(field, cols, rows, passes = 1) {
+  let src = field;
+  let dst = new Float32Array(field.length);
+  for (let p = 0; p < passes; p++) {
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        let sum = 0, n = 0;
+        for (let dj = -1; dj <= 1; dj++) {
+          for (let di = -1; di <= 1; di++) {
+            const ii = clamp(i + di, 0, cols - 1), jj = clamp(j + dj, 0, rows - 1);
+            sum += src[jj * cols + ii]; n++;
+          }
+        }
+        dst[j * cols + i] = sum / n;
+      }
+    }
+    const t = src; src = dst; dst = t;
+  }
+  if (src !== field) field.set(src);
+}
+
 function smoothField(hf, passes = 3) {
   const { cols, rows } = hf;
   let src = hf.height;
@@ -281,7 +307,7 @@ export function buildWorldHeightfield(spec) {
 
   // Terrace it. Settlement platforms keep their exact level so buildings never
   // straddle a step.
-  smoothField(hf, 3);
+  smoothField(hf, 5);
   for (let k = 0; k < hf.height.length; k++) {
     hf.height[k] = Math.max(WATER_LEVEL - 18, quantise(hf.height[k]));
   }
@@ -293,22 +319,24 @@ export function buildWorldHeightfield(spec) {
       }
     }
   }
-  // Final material pass: authored ground (road, farm, sand) wins; everything
-  // else is grass until the ground is genuinely steep or high, which is what
-  // makes highlands read as highlands.
+  // Exposed stone is a smooth field, not a per-cell decision: steep or high
+  // ground turns rocky gradually. Switching cell by cell turned highlands into
+  // a grey checkerboard.
   for (let j = 0; j < hf.rows; j++) {
     for (let i = 0; i < hf.cols; i++) {
       const k = j * hf.cols + i;
-      const b = hf.biome[k];
-      if (b === BIOME.road || b === BIOME.farm || b === BIOME.sand) continue;
       const here = hf.height[k];
       let maxDrop = 0;
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         maxDrop = Math.max(maxDrop, Math.abs(here - hf.height[hf.idx(i + di, j + dj)]));
       }
-      hf.biome[k] = (here > 190 || maxDrop >= STEP * 2.5) ? BIOME.rock : BIOME.grass;
+      hf.rock[k] = Math.max(
+        smoothstep(STEP * 1.2, STEP * 3.2, maxDrop),
+        smoothstep(150, 230, here),
+      );
     }
   }
+  blurField(hf.rock, hf.cols, hf.rows, 2);
 
   hf.platforms = platforms;
   return hf;
@@ -366,7 +394,6 @@ export function buildBattleHeightfield(kind, seed, w, h) {
       if (kind === 'forest') {
         ht += fbm(detail, x, y, 3, 0.006) * 10;
       }
-      if (ht > 74) biome = BIOME.rock;
       hf.height[j * hf.cols + i] = ht;
       hf.biome[j * hf.cols + i] = biome;
     }
@@ -389,6 +416,17 @@ export function buildBattleHeightfield(kind, seed, w, h) {
   for (let k = 0; k < hf.height.length; k++) {
     hf.height[k] = Math.max(WATER_LEVEL - 20, quantise(hf.height[k]));
   }
+  for (let j = 0; j < hf.rows; j++) {
+    for (let i = 0; i < hf.cols; i++) {
+      const k = j * hf.cols + i;
+      let maxDrop = 0;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        maxDrop = Math.max(maxDrop, Math.abs(hf.height[k] - hf.height[hf.idx(i + di, j + dj)]));
+      }
+      hf.rock[k] = smoothstep(STEP * 1.2, STEP * 3.0, maxDrop);
+    }
+  }
+  blurField(hf.rock, hf.cols, hf.rows, 2);
   return hf;
 }
 
@@ -407,6 +445,7 @@ export function buildTerrainMesh(hf) {
   const H = (i, j) => hf.height[hf.idx(i, j)];
   const B = (i, j) => hf.biome[hf.idx(i, j)];
   const S = (i, j) => hf.stain[hf.idx(i, j)];
+  const RK = (i, j) => (hf.rock ? hf.rock[hf.idx(i, j)] : 0);
 
   const pushTri = (ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz, col) => {
     positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
@@ -415,8 +454,13 @@ export function buildTerrainMesh(hf) {
   };
 
   const SOOT = BIOME_COLOR[BIOME.soot];
-  const shade = (biome, height, jitter, stain) => {
-    const base = BIOME_COLOR[biome] || BIOME_COLOR[BIOME.grass];
+  const ROCK = BIOME_COLOR[BIOME.rock];
+  const shade = (biome, height, jitter, stain, rock) => {
+    const base = (BIOME_COLOR[biome] || BIOME_COLOR[BIOME.grass]).slice();
+    // bare stone shows through where the ground is steep or high
+    if (rock > 0.01 && biome !== BIOME.road && biome !== BIOME.farm) {
+      for (let i = 0; i < 3; i++) base[i] = base[i] * (1 - rock) + ROCK[i] * rock;
+    }
     // higher ground dries out; slight per-cell variation stops it reading flat,
     // kept small so the ground never turns into a checkerboard
     const k = 1 + jitter * 0.045 + clamp((height - 60) / 520, -0.04, 0.09);
@@ -433,7 +477,7 @@ export function buildTerrainMesh(hf) {
       const z0 = hf.wy(j), z1 = z0 + cell;
       const y = H(i, j);
       const jitter = ((i * 73856093) ^ (j * 19349663)) % 7 / 7 - 0.5;
-      const col = shade(B(i, j), y, jitter, S(i, j));
+      const col = shade(B(i, j), y, jitter, S(i, j), RK(i, j));
       // top face (two tris, y-up)
       pushTri(x0, y, z0, x0, y, z1, x1, y, z1, 0, 1, 0, col);
       pushTri(x0, y, z0, x1, y, z1, x1, y, z0, 0, 1, 0, col);

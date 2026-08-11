@@ -201,14 +201,17 @@ def battlements_round(g, cx, cy, r_out, thick, z0, z_sill, z_top, n=12,
         a = 2 * math.pi * k / n
         px, py = cx + rm * math.cos(a), cy + rm * math.sin(a)
         if corbel:
-            box(cx + (r_out - 1.4) * math.cos(a), cy + (r_out - 1.4) * math.sin(a),
-                z0 - 4.2, 4.4, tang * 0.42, 4.2, cap, g, rot=(0, 0, a))
+            box(cx + (r_out - 1.7) * math.cos(a), cy + (r_out - 1.7) * math.sin(a),
+                z0 - 4.6, 3.4, tang * 0.32, 4.6, cap, g, rot=(0, 0, a))
+            box(cx + (r_out - 1.7) * math.cos(a + math.pi / n),
+                cy + (r_out - 1.7) * math.sin(a + math.pi / n),
+                z0 - 4.6, 3.4, tang * 0.32, 4.6, cap, g, rot=(0, 0, a + math.pi / n))
         box(px, py, z0, thick, tang, z_sill - z0, material, g, rot=(0, 0, a))
         box(px, py, z_sill, thick + 0.8, tang, 1.2, cap, g, rot=(0, 0, a))
         if k % 2 == 0:                     # merlon over every other bay
-            box(px, py, z_sill + 1.2, thick, tang * 0.68, z_top - z_sill - 1.2,
+            box(px, py, z_sill + 1.2, thick, tang * 0.60, z_top - z_sill - 1.2,
                 material, g, rot=(0, 0, a))
-            box(px, py, z_top, thick + 0.8, tang * 0.68 + 0.8, 1.2, cap, g,
+            box(px, py, z_top, thick + 0.9, tang * 0.60 + 0.9, 1.2, cap, g,
                 rot=(0, 0, a))
 
 
@@ -316,26 +319,74 @@ def wall_segment():
 
 
 def wall_corner():
-    """The same profile turning 90 degrees. The west arm butts a segment at
-    x = -30, the north arm butts one at y = +30, and the merlon rhythm carries
-    round a solid corner block."""
+    """The same profile turning 90 degrees: the west arm butts a segment at
+    x = -30, the north arm butts one at y = +30. Every course is laid as one
+    L-shaped band rather than two overlapping runs, so no two solids fight
+    over the same face at the quoin."""
     g = empty('wall_corner')
-    curtain(g, 'x', 0.0, -1, -30.0, 12.0, merlons=[-25, -15, -5],
-            corbels=[-27, -21, -15, -9, -3, 3, 9], slits=[-10.0],
-            piers=[-20.0, 0.0], rough=random.Random(3))
-    curtain(g, 'y', 0.0, +1, -12.0, 30.0, merlons=[5, 15, 25],
-            corbels=[-9, -3, 3, 9, 15, 21, 27], slits=[10.0],
-            piers=[0.0, 20.0], rough=random.Random(5))
+    U = 30.0
 
-    # the quoin: plinth, body and parapet closing the outside of the turn
-    bx(g, 12.0, 15.5, -15.5, -12.0, 0, 9, 'stone_dark')
-    bx(g, 12.0, 13.5, -13.5, -12.0, 9, 14, 'stone')
-    bx(g, 12.0, 16.0, -16.0, -12.0, 33.0, Z_WALK, 'stone_light')
-    bx(g, 12.0, 16.0, -16.0, -12.0, Z_WALK, Z_SILL, 'stone')
-    bx(g, 11.5, 16.5, -16.5, -11.5, Z_SILL, Z_SILL + 1.2, 'stone_light')
-    bx(g, 2.0, 16.0, -16.0, -2.0, Z_SILL + 1.2, Z_TOP, 'stone')
-    bx(g, 1.5, 16.5, -16.5, -1.5, Z_TOP, Z_TOP + 1.2, 'stone_light')
-    bx(g, 12.0, 13.4, -13.4, -12.0, 29.5, 31.6, 'stone_light')
+    def lband(v0, v1, z0, z1, m):
+        """One course carried round the turn: a south leg and an east leg that
+        touch without overlapping, whatever the offsets."""
+        bx(g, -U, v1, -v1, -v0, z0, z1, m)
+        bx(g, v0, v1, -v0, U, z0, z1, m)
+
+    lband(-V_BODY, V_PLIN, 0, 9, 'stone_dark')             # battered foot
+    lband(-V_BODY, V_PLIN2, 9, 14, 'stone')
+    lband(-V_BODY - 1.8, -V_BODY, 0, 6, 'stone_dark')
+    lband(-V_BODY, V_BODY, 14, Z_WALK, 'stone')            # body
+    lband(V_BODY, V_BODY + 0.8, 14.0, 15.4, 'stone_dark')  # courses
+    lband(V_BODY, V_BODY + 1.4, 29.5, 31.6, 'stone_light')
+    lband(-V_KERB, V_PAR_I, Z_WALK, Z_WALK + 1.0, 'stone_light')          # walk
+    lband(-V_BODY, -V_KERB, Z_WALK, Z_WALK + 4.0, 'stone')
+    lband(-V_BODY - 0.5, -V_KERB + 0.5, Z_WALK + 4.0, Z_WALK + 5.2, 'stone_light')
+    lband(V_PAR_I, V_PAR_O, Z_WALK, Z_SILL, 'stone')                      # parapet
+    lband(V_PAR_I - 0.5, V_PAR_O + 0.5, Z_SILL, Z_SILL + 1.2, 'stone_light')
+
+    for u in (-27, -21, -15, -9, -3, 3, 9, 13.5):          # corbels, south leg
+        bx(g, u - 2.1, u + 2.1, -V_PAR_O, -V_BODY, 33.0, Z_WALK, 'stone_light')
+    for u in (-9, -3, 3, 9, 15, 21, 27):                   # corbels, east leg
+        bx(g, V_BODY, V_PAR_O, u - 2.1, u + 2.1, 33.0, Z_WALK, 'stone_light')
+
+    rng = random.Random(3)
+    for (ax, u) in (('x', -18.0), ('x', -7.0), ('y', 8.0), ('y', 21.0)):
+        w = rng.uniform(6.0, 10.0)
+        z = rng.uniform(17.0, 27.0)
+        m = rng.choice(('stone_light', 'stone_dark'))
+        if ax == 'x':
+            bx(g, u - w / 2, u + w / 2, -V_BODY - 0.35, -V_BODY, z, z + 3.2, m)
+        else:
+            bx(g, V_BODY, V_BODY + 0.35, u - w / 2, u + w / 2, z, z + 3.2, m)
+
+    for (ax, u) in (('x', -10.0), ('y', 10.0)):             # arrow loops
+        if ax == 'x':
+            loop_hole(g, u, -V_BODY, 16.0, '-y', w=5.6, h=12.0, depth=1.0)
+        else:
+            loop_hole(g, V_BODY, u, 16.0, '+x', w=5.6, h=12.0, depth=1.0)
+
+    for (ax, u) in (('x', -20.0), ('y', 20.0)):             # relieving piers
+        if ax == 'x':
+            bx(g, u - 3.6, u + 3.6, V_BODY, V_BODY + 3.6, 0, 34.0, 'stone')
+            bx(g, u - 4.4, u + 4.4, V_BODY, V_BODY + 4.4, 34.0, 37.0, 'stone_light')
+            bx(g, u - 3.0, u + 3.0, V_BODY, V_BODY + 2.6, 37.0, Z_WALK, 'stone_dark')
+        else:
+            bx(g, -V_BODY - 3.6, -V_BODY, u - 3.6, u + 3.6, 0, 34.0, 'stone')
+            bx(g, -V_BODY - 4.4, -V_BODY, u - 4.4, u + 4.4, 34.0, 37.0, 'stone_light')
+            bx(g, -V_BODY - 2.6, -V_BODY, u - 3.0, u + 3.0, 37.0, Z_WALK, 'stone_dark')
+
+    zc = Z_SILL + 1.2
+    for u in (-25.0, -15.0, -5.0):                          # merlons, south leg
+        bx(g, u - MER / 2, u + MER / 2, -V_PAR_O, -V_PAR_I, zc, Z_TOP, 'stone')
+        bx(g, u - MER / 2 - 0.5, u + MER / 2 + 0.5, -V_PAR_O - 0.5, -V_PAR_I + 0.5,
+           Z_TOP, Z_TOP + 1.2, 'stone_light')
+    for u in (5.0, 15.0, 25.0):                             # merlons, east leg
+        bx(g, V_PAR_I, V_PAR_O, u - MER / 2, u + MER / 2, zc, Z_TOP, 'stone')
+        bx(g, V_PAR_I - 0.5, V_PAR_O + 0.5, u - MER / 2 - 0.5, u + MER / 2 + 0.5,
+           Z_TOP, Z_TOP + 1.2, 'stone_light')
+    bx(g, 2.0, V_PAR_O, -V_PAR_O, -2.0, zc, Z_TOP, 'stone')          # the quoin
+    bx(g, 1.5, V_PAR_O + 0.5, -V_PAR_O - 0.5, -1.5, Z_TOP, Z_TOP + 1.2, 'stone_light')
+    bx(g, 2.0, V_PAR_I, -V_PAR_I, -2.0, Z_WALK, zc, 'stone')         # its footing
     return g
 
 
@@ -343,131 +394,129 @@ def wall_corner():
 
 def loop_hole(g, x, y, z, face, w=5.2, h=12.0, depth=1.2):
     """An arrow loop: a splayed stone surround with a dark slot in it.
-    `face` is the outward axis, one of '+x','-x','+y','-y'."""
+    `face` is the outward axis, one of '+x', '-x', '+y', '-y'."""
     ax, sgn = face[1], (1 if face[0] == '+' else -1)
     if ax == 'y':
         bx(g, x - w / 2, x + w / 2, y, y + sgn * depth, z, z + h, 'stone_light')
-        bx(g, x - 0.9, x + 0.9, y + sgn * depth, y + sgn * (depth + 0.4),
+        bx(g, x - 0.9, x + 0.9, y + sgn * depth, y + sgn * (depth + 0.5),
            z + 1.8, z + h - 1.8, 'soot')
-        bx(g, x - w / 2, x + w / 2, y + sgn * depth, y + sgn * (depth + 0.5),
-           z + h, z + h + 1.4, 'stone_dark')
+        bx(g, x - w / 2, x + w / 2, y, y + sgn * (depth + 0.6),
+           z + h, z + h + 1.5, 'stone_dark')
     else:
         bx(g, x, x + sgn * depth, y - w / 2, y + w / 2, z, z + h, 'stone_light')
-        bx(g, x + sgn * depth, x + sgn * (depth + 0.4), y - 0.9, y + 0.9,
+        bx(g, x + sgn * depth, x + sgn * (depth + 0.5), y - 0.9, y + 0.9,
            z + 1.8, z + h - 1.8, 'soot')
-        bx(g, x + sgn * depth, x + sgn * (depth + 0.5), y - w / 2, y + w / 2,
-           z + h, z + h + 1.4, 'stone_dark')
+        bx(g, x, x + sgn * (depth + 0.6), y - w / 2, y + w / 2,
+           z + h, z + h + 1.5, 'stone_dark')
 
 
 def plank_door(g, x0, x1, y, thick, z0, z1, sgn=1, bands=3):
-    """Timber leaf with iron banding and studs, and the dark of the opening
-    behind it."""
+    """A timber leaf: boards, iron banding, studs."""
     bx(g, x0, x1, y, y + sgn * thick, z0, z1, 'timber')
-    for i in range(int((x1 - x0) / 3.4)):
-        u = x0 + 1.0 + i * 3.4
-        bx(g, u, u + 0.5, y + sgn * thick, y + sgn * (thick + 0.35), z0, z1,
-           'timber_light')
+    n = max(2, int((x1 - x0) / 3.4))
+    for i in range(n):
+        u = x0 + (x1 - x0) * (i + 0.5) / n
+        bx(g, u - 0.25, u + 0.25, y + sgn * thick, y + sgn * (thick + 0.4),
+           z0, z1, 'timber_light')
     for i in range(bands):
-        zz = z0 + (z1 - z0) * (i + 0.6) / (bands + 0.2)
-        bx(g, x0, x1, y + sgn * thick, y + sgn * (thick + 0.7), zz, zz + 1.9, 'iron')
-        for sx in (x0 + 1.2, x1 - 1.9):
-            bx(g, sx, sx + 0.8, y + sgn * (thick + 0.7), y + sgn * (thick + 1.1),
-               zz + 0.5, zz + 1.3, 'iron_dark')
+        zz = z0 + (z1 - z0) * (i + 0.55) / (bands + 0.1)
+        bx(g, x0, x1, y + sgn * thick, y + sgn * (thick + 0.8), zz, zz + 2.0, 'iron')
+        for sx in (x0 + 1.0, x1 - 2.0):
+            bx(g, sx, sx + 1.0, y + sgn * (thick + 0.8), y + sgn * (thick + 1.3),
+               zz + 0.5, zz + 1.5, 'iron_dark')
 
 
 def tower_round():
     """Drum tower: battered foot, loops at two fighting levels, corbelled
-    battlements well above the curtain. Door faces +Y, into the bailey."""
+    battlements well clear of the curtain. Door faces +Y, into the bailey."""
     g = empty('tower_round')
     rng = random.Random(17)
-    RB, ZB = 22.0, 62.0
-    cyl(0, 0, 0, 26.0, 9.0, 'stone_dark', g, verts=16)
-    cyl(0, 0, 9.0, 24.0, 6.0, 'stone', g, verts=16)
+    RB, ZB = 20.0, 66.0
+    cyl(0, 0, 0, 24.5, 9.0, 'stone_dark', g, verts=16)
+    cyl(0, 0, 9.0, 22.3, 6.0, 'stone', g, verts=16)
     cyl(0, 0, 15.0, RB, ZB - 15.0, 'stone', g, verts=16)
-    cyl(0, 0, 52.0, RB + 1.2, 2.2, 'stone_light', g, verts=16)   # string course
-    cyl(0, 0, 30.0, RB + 0.6, 1.4, 'stone_dark', g, verts=16)
+    cyl(0, 0, 55.0, RB + 1.3, 2.4, 'stone_light', g, verts=16)
+    cyl(0, 0, 30.0, RB + 0.7, 1.5, 'stone_dark', g, verts=16)
 
-    for k in range(14):                       # hand-laid coursing
+    for _ in range(16):                       # hand-laid coursing
         a = rng.uniform(0, math.tau)
-        z = rng.uniform(17.0, 50.0)
-        box(math.cos(a) * (RB - 0.2), math.sin(a) * (RB - 0.2), z,
-            1.2, rng.uniform(5.0, 9.0), rng.uniform(3.0, 4.2),
+        z = rng.uniform(17.0, 53.0)
+        box(math.cos(a) * (RB + 0.1), math.sin(a) * (RB + 0.1), z,
+            1.2, rng.uniform(5.0, 9.0), rng.uniform(2.8, 4.0),
             rng.choice(('stone_light', 'stone_dark')), g, rot=(0, 0, a))
 
-    for k in range(6):                        # lower fighting level
-        a = R(30 + 60 * k)
-        box(math.cos(a) * (RB - 0.3), math.sin(a) * (RB - 0.3), 26.0,
-            1.4, 5.4, 12.0, 'stone_light', g, rot=(0, 0, a))
-        box(math.cos(a) * (RB + 0.7), math.sin(a) * (RB + 0.7), 28.0,
-            0.6, 1.7, 8.0, 'soot', g, rot=(0, 0, a))
-    for k in range(6):                        # upper level, staggered
-        a = R(60 * k)
-        box(math.cos(a) * (RB - 0.3), math.sin(a) * (RB - 0.3), 40.0,
-            1.4, 5.4, 12.0, 'stone_light', g, rot=(0, 0, a))
-        box(math.cos(a) * (RB + 0.7), math.sin(a) * (RB + 0.7), 42.0,
-            0.6, 1.7, 8.0, 'soot', g, rot=(0, 0, a))
+    for lvl, off in ((25.0, 30.0), (42.0, 0.0)):
+        for k in range(6):
+            a = R(off + 60 * k)
+            box(math.cos(a) * (RB - 0.4), math.sin(a) * (RB - 0.4), lvl,
+                1.6, 5.6, 12.5, 'stone_light', g, rot=(0, 0, a))
+            box(math.cos(a) * (RB + 0.7), math.sin(a) * (RB + 0.7), lvl + 2.0,
+                0.7, 1.8, 8.5, 'soot', g, rot=(0, 0, a))
+            box(math.cos(a) * (RB - 0.4), math.sin(a) * (RB - 0.4), lvl + 12.5,
+                1.9, 5.6, 1.5, 'stone_dark', g, rot=(0, 0, a))
 
-    bx(g, -8.0, 8.0, 19.0, 23.6, 0, 26.0, 'stone_light')          # doorway
-    bx(g, -6.0, 6.0, 20.5, 23.9, 0, 22.0, 'soot')
-    for k in range(5):                                            # voussoirs
+    for sx in (-1, 1):                                            # door jambs
+        bx(g, sx * 6.2, sx * 8.8, 16.8, 21.8, 0, 20.0, 'stone_light')
+    bx(g, -6.2, 6.2, 18.2, 22.2, 0, 20.0, 'soot')
+    for k in range(5):                                            # arch head
         th = math.pi * (k + 0.5) / 5
-        box(math.cos(th) * 8.4, 22.4, 16.0 + math.sin(th) * 8.4 - 2.6,
-            4.6, 3.6, 5.2, 'stone', g, rot=(0, -th, 0))
-    plank_door(g, -5.4, 5.4, 21.6, 1.5, 0, 16.0, bands=2)
+        box(math.cos(th) * 7.5, 19.3, 20.0 + math.sin(th) * 7.5 - 2.7,
+            5.2, 5.0, 5.4, 'stone_light', g, rot=(0, -th, 0))
+    bx(g, -5.0, 5.0, 18.6, 21.6, 20.0, 25.4, 'soot')
+    plank_door(g, -5.6, 5.6, 19.4, 1.6, 0, 19.4, bands=2)
 
-    battlements_round(g, 0, 0, 24.5, 9.0, ZB, 68.2, 78.0, n=12)
+    battlements_round(g, 0, 0, 23.0, 9.0, ZB, 72.5, 84.0, n=12)
     return g
 
 
 def tower_square():
     """Square corner tower with a stair turret breaking the skyline — the
-    turret is how you get from the bailey to the wall walk."""
+    turret is how the garrison gets from the bailey up to the wall walk."""
     g = empty('tower_square')
     rng = random.Random(29)
-    A, ZB = 22.0, 58.0
-    bx(g, -A - 4, A + 4, -A - 4, A + 4, 0, 9.0, 'stone_dark')
-    bx(g, -A - 2, A + 2, -A - 2, A + 2, 9.0, 15.0, 'stone')
+    A, ZB = 21.0, 60.0
+    bx(g, -A - 4.5, A + 4.5, -A - 4.5, A + 4.5, 0, 9.0, 'stone_dark')
+    bx(g, -A - 2.2, A + 2.2, -A - 2.2, A + 2.2, 9.0, 15.0, 'stone')
     bx(g, -A, A, -A, A, 15.0, ZB, 'stone')
     for s in (-1, 1):                          # clasping corner pilasters
         for t in (-1, 1):
-            bx(g, s * A - s * 6.5, s * A + s * 1.1, t * A - t * 6.5, t * A + t * 1.1,
-               15.0, ZB, 'stone_light')
-    bx(g, -A - 1.2, A + 1.2, -A - 1.2, A + 1.2, 50.0, 52.2, 'stone_light')
-    bx(g, -A - 0.6, A + 0.6, -A - 0.6, A + 0.6, 28.0, 29.4, 'stone_dark')
-    for k in range(10):
+            bx(g, s * A - s * 7.0, s * (A + 1.3), t * A - t * 7.0, t * (A + 1.3),
+               15.0, ZB - 2.4, 'stone_light')
+    bx(g, -A - 1.4, A + 1.4, -A - 1.4, A + 1.4, 51.0, 53.4, 'stone_light')
+    bx(g, -A - 0.7, A + 0.7, -A - 0.7, A + 0.7, 29.0, 30.5, 'stone_dark')
+    for _ in range(12):
         f = rng.choice(('-y', '+x', '-x'))
-        u = rng.uniform(-14, 14)
-        z = rng.uniform(17, 46)
+        u = rng.uniform(-13, 13)
+        z = rng.uniform(17, 47)
+        h = rng.uniform(2.8, 4.0)
+        m = rng.choice(('stone_light', 'stone_dark'))
         if f == '-y':
-            bx(g, u - 4, u + 4, -A - 0.55, -A, z, z + rng.uniform(3, 4.2),
-               rng.choice(('stone_light', 'stone_dark')))
+            bx(g, u - 4, u + 4, -A - 0.45, -A + 0.2, z, z + h, m)
         else:
             sg = 1 if f == '+x' else -1
-            bx(g, sg * A, sg * (A + 0.55), u - 4, u + 4, z, z + rng.uniform(3, 4.2),
-               rng.choice(('stone_light', 'stone_dark')))
+            bx(g, sg * (A + 0.45), sg * (A - 0.2), u - 4, u + 4, z, z + h, m)
 
-    for u in (-11.0, 11.0):
-        loop_hole(g, u, -A, 25.0, '-y')
-        loop_hole(g, u, -A, 40.0, '-y')
-        loop_hole(g, -A, u, 25.0, '-x')
+    for u in (-10.0, 10.0):
+        loop_hole(g, u, -A, 24.0, '-y')
+        loop_hole(g, u, -A, 39.0, '-y')
+        loop_hole(g, -A, u, 24.0, '-x')
         loop_hole(g, A, u, 32.0, '+x')
-    loop_hole(g, -11.0, A, 32.0, '+y')
+    loop_hole(g, -10.0, A, 33.0, '+y')
 
-    bx(g, -8.0, 8.0, A - 0.4, A + 3.2, 0, 26.0, 'stone_light')     # door, +Y
-    bx(g, -6.0, 6.0, A - 1.0, A + 3.4, 0, 22.0, 'soot')
-    bx(g, -9.0, 9.0, A - 0.4, A + 3.6, 22.0, 24.6, 'stone')
-    plank_door(g, -5.4, 5.4, A + 1.4, 1.5, 0, 21.0, bands=2)
+    bx(g, -8.5, 8.5, A - 0.6, A + 3.0, 0, 25.0, 'stone_light')     # door, +Y
+    bx(g, -6.2, 6.2, A - 1.2, A + 3.2, 0, 22.0, 'soot')
+    bx(g, -10.0, 10.0, A - 0.6, A + 3.4, 25.0, 27.6, 'stone')
+    plank_door(g, -5.6, 5.6, A + 1.0, 1.6, 0, 21.5, bands=2)
 
-    battlements(g, -A - 2.5, A + 2.5, -A - 2.5, A + 2.5, ZB, 64.2, 74.0,
-                thick=9.0, period=11.0, mer=6.5, corner=11.0, corbel=6.0)
+    battlements(g, -A - 3.0, A + 3.0, -A - 3.0, A + 3.0, ZB, 66.5, 77.0,
+                thick=9.0, period=11.0, mer=6.2, corner=11.0, corbel=6.0)
 
-    # stair turret, bailey-side corner
-    tx0, ty0 = 6.0, 6.0
-    bx(g, tx0, tx0 + 17.0, ty0, ty0 + 17.0, ZB - 4.0, 80.0, 'stone')
-    bx(g, tx0 - 1.0, tx0 + 18.0, ty0 - 1.0, ty0 + 18.0, 80.0, 82.4, 'stone_light')
-    loop_hole(g, tx0 + 8.5, ty0 + 17.0, 68.0, '+y', w=4.4, h=9.0)
-    loop_hole(g, tx0 + 17.0, ty0 + 8.5, 72.0, '+x', w=4.4, h=9.0)
-    bx(g, tx0 - 1.0, tx0 + 4.5, ty0 + 4.0, ty0 + 13.0, ZB + 2.0, ZB + 16.0, 'soot')
-    pitched_roof(tx0 + 8.5, ty0 + 8.5, 82.4, 15.0, 15.0, 9.0, 'roof_slate', g,
-                 overhang=1.6, eave='timber')
+    tx0, ty0 = 4.0, 4.0                        # stair turret, bailey corner
+    bx(g, tx0, tx0 + 18.0, ty0, ty0 + 18.0, ZB - 6.0, 84.0, 'stone')
+    bx(g, tx0 - 1.2, tx0 + 19.2, ty0 - 1.2, ty0 + 19.2, 84.0, 86.6, 'stone_light')
+    loop_hole(g, tx0 + 9.0, ty0 + 18.0, 70.0, '+y', w=4.6, h=9.0)
+    loop_hole(g, tx0 + 18.0, ty0 + 9.0, 75.0, '+x', w=4.6, h=9.0)
+    bx(g, tx0 - 1.4, tx0 + 5.0, ty0 + 4.0, ty0 + 14.0, ZB + 4.0, ZB + 18.0, 'soot')
+    pitched_roof(tx0 + 9.0, ty0 + 9.0, 86.6, 16.0, 16.0, 10.0, 'roof_slate', g,
+                 overhang=1.8, eave='timber')
     return g
