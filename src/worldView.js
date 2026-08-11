@@ -91,7 +91,7 @@ export class WorldView {
   build(campaign) {
     const gfx = this.gfx;
     gfx.clear();
-    gfx.setSkyMood({ background: 0x93aec0, haze: 0.85, sunIntensity: 1.85, skyLight: 0.62 });
+    gfx.setSkyMood({ background: 0x93aec0, haze: 0.85, sunIntensity: 1.05, skyLight: 0.45 });
 
     this.hf = buildWorldHeightfield({
       w: WORLD.w, h: WORLD.h, cell: 26, seed: 20260811,

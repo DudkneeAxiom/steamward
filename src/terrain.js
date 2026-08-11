@@ -34,10 +34,16 @@ const BIOME_COLOR = {
 // real drop shows bare rock. Colouring every step grey turned the whole map
 // into speckle.
 const CLIFF_ROCK = [0.42, 0.41, 0.38];
-const cliffColor = (base, steps) => {
-  if (steps >= 3) return CLIFF_ROCK;
-  const k = steps >= 2 ? 0.6 : 0.74;
-  return [base[0] * k, base[1] * k, base[2] * k];
+
+// Vertex colours go to the GPU as linear values, but these are authored as
+// sRGB — what the eye sees. Skipping the conversion is what makes ground read
+// as washed-out beige instead of earth.
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const toLinear = (rgb) => [srgbToLinear(rgb[0]), srgbToLinear(rgb[1]), srgbToLinear(rgb[2])];
+const cliffColor = (baseLinear, steps) => {
+  if (steps >= 3) return toLinear(CLIFF_ROCK);
+  const k = steps >= 2 ? 0.55 : 0.72;
+  return [baseLinear[0] * k, baseLinear[1] * k, baseLinear[2] * k];
 };
 
 // ---------------------------------------------------------------- noise
@@ -348,8 +354,9 @@ export function buildBattleHeightfield(kind, seed, w, h) {
         }
       }
       if (kind === 'industrial') {
+        // A works yard is trodden earth gone black with coal dust.
         biome = BIOME.dirt;
-        hf.stain[j * hf.cols + i] = clamp(0.35 + fbm(detail, x, y, 2, 0.004) * 1.6, 0, 0.9);
+        hf.stain[j * hf.cols + i] = clamp(0.62 + fbm(detail, x, y, 2, 0.0045) * 1.4, 0.15, 0.95);
         ht = ht * 0.7 + 12;                      // worked flat for machinery
       }
       if (kind === 'settlement') {
@@ -417,7 +424,7 @@ export function buildTerrainMesh(hf) {
     if (stain > 0.01) {
       for (let i = 0; i < 3; i++) out[i] = out[i] * (1 - stain) + SOOT[i] * stain;
     }
-    return [clamp(out[0], 0, 1), clamp(out[1], 0, 1), clamp(out[2], 0, 1)];
+    return toLinear([clamp(out[0], 0, 1), clamp(out[1], 0, 1), clamp(out[2], 0, 1)]);
   };
 
   for (let j = 0; j < rows; j++) {
@@ -508,8 +515,8 @@ export function buildWaterMesh(hf, level = WATER_LEVEL) {
  */
 export function buildRoadMesh(hf, polylines, width = 30) {
   const positions = [], normals = [], colors = [];
-  const col = [0.43, 0.36, 0.25];
-  const colEdge = [0.36, 0.30, 0.20];
+  const col = toLinear([0.43, 0.36, 0.25]);
+  const colEdge = toLinear([0.36, 0.30, 0.20]);
 
   for (const line of polylines) {
     // resample so the ribbon follows terraces closely

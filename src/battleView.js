@@ -42,8 +42,8 @@ export class BattleView {
     gfx.setSkyMood({
       background: kind === 'industrial' ? 0x8f8b80 : kind === 'forest' ? 0x8aa596 : 0x9ab4c2,
       haze: kind === 'industrial' ? 1.5 : 0.7,
-      sunIntensity: kind === 'industrial' ? 1.6 : 1.9,
-      skyLight: kind === 'forest' ? 0.55 : 0.65,
+      sunIntensity: kind === 'industrial' ? 0.9 : 1.05,
+      skyLight: kind === 'forest' ? 0.4 : 0.46,
     });
 
     this.hf = buildBattleHeightfield(kind, battle.ctx.seed | 0, battle.w, battle.h);

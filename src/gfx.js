@@ -56,7 +56,7 @@ export class Gfx {
   _buildLights() {
     // Warm low sun for long readable shadows, cool sky fill so shadowed faces
     // stay legible instead of going black.
-    const sun = new THREE.DirectionalLight(0xffeeda, 1.85);
+    const sun = new THREE.DirectionalLight(0xffeeda, 1.05);
     sun.position.set(-620, 900, 420);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.softwareGL ? 1024 : 2048, this.softwareGL ? 1024 : 2048);
@@ -70,11 +70,11 @@ export class Gfx {
     this.scene.add(sun.target);
     this.sun = sun;
 
-    const sky = new THREE.HemisphereLight(0xa8c4dc, 0x4a4534, 0.62);
+    const sky = new THREE.HemisphereLight(0xa8c4dc, 0x4a4534, 0.45);
     this.scene.add(sky);
     this.hemi = sky;
 
-    const bounce = new THREE.DirectionalLight(0xbcc8d4, 0.22);
+    const bounce = new THREE.DirectionalLight(0xbcc8d4, 0.15);
     bounce.position.set(500, 300, -600);
     this.scene.add(bounce);
   }

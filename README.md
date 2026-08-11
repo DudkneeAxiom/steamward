@@ -110,7 +110,8 @@ validated; corrupted or outdated saves are ignored safely.
 
 ## Architecture
 
-Vanilla JavaScript ES modules + a single Canvas 2D renderer. No frameworks.
+Vanilla JavaScript ES modules + WebGL (three.js, vendored locally — nothing is
+fetched at runtime).
 
 ```
 index.html, style.css      shell + DOM UI skin
@@ -119,50 +120,78 @@ src/data.js                all design data: units, promotions, factions, tuning
 src/campaign.js            world geometry, campaign state, save/load, actions
 src/strategic.js           strategic sim: movement, AI, captures, encounters
 src/battle.js              tactical sim: A* grid, formations, combat, morale
-src/strategicRender.js     map rendering (2.5D diorama projection)
-src/battleRender.js        battlefield rendering, particles
-src/sprites.js             voxel atlas loading and blitting
-src/camera.js              shared squashed-Y camera
+src/gfx.js                 WebGL core: scene, 2.5D camera, lighting, picking
+src/terrain.js             heightfield generation and terrain/road/water meshing
+src/models.js              GLB loading, vertex-colour baking, instancing
+src/unitView.js            soldiers: instanced parts + procedural animation
+src/worldView.js           the strategic world scene
+src/battleView.js          the tactical battlefield scene
 src/ui.js                  panels, dialogs, alerts, battle HUD
 src/soldiers.js            persistent soldier records, XP, promotions
 src/audio.js               fully procedural WebAudio SFX, ambience and score
 src/names.js, src/util.js  naming, math, seeded RNG
-assets/                    generated sprite atlases (checked in)
-tools/blender/             the Blender scripts that generate them
+assets/models/             generated GLB assets (checked in) + manifest
+vendor/three/              vendored three.js — no runtime CDN
+tools/blender/             the Blender scripts that generate the assets
 ```
 
-The 2.5D look comes from a Y-squashed camera (`y × 0.68`) with upright sprites,
-painter's-algorithm depth sort and per-entity height offsets. Battles run on a
-coarse A* grid with line-of-sight path smoothing plus local separation forces;
-unit AI updates are staggered and neighbor queries use a spatial hash, so 40v40
-stays comfortably within frame budget.
+**The world is geometry, not drawing.** Terrain is a heightfield built from
+authored features — hills, a river cutting a real valley, roads flattened into
+corridors, level platforms under settlements — plus controlled fBm for
+richness. Heights are blurred and then quantised into steps, so meshing gives
+broad flat terraces joined by genuine vertical cliff faces. Water exists only
+where the ground is actually below the waterline. Roads are ribbons that follow
+the ground. Ground material is decided from the finished terrain's height and
+slope, so highlands show rock and works yards are stained with coal dust.
+
+The camera is orthographic at a fixed 42° — the angle is what sells "miniature
+you could reach into". Gameplay still thinks in flat (x, y); the renderer owns
+the third dimension and looks up ground height to place things. Clicks are
+raycast against the real terrain, so an order on a hillside lands where the
+player is looking.
+
+**Batching.** GLB material colours are baked into vertex colours at load and
+the pieces merged, leaving one geometry per asset. Scenery then draws as a
+single InstancedMesh per type and soldiers as one per animated body part, so a
+40v40 battle is a few dozen draw calls. Soldiers have no skeletons: legs, arms
+and weapons are separate parts with their own pivots, animated procedurally.
+
+Battles run on a coarse A* grid with line-of-sight path smoothing plus local
+separation forces; unit AI updates are staggered and neighbour queries use a
+spatial hash. The simulation is driven by wall-clock time with a fixed tactical
+timestep, so a slow machine runs the same campaign, just at a lower frame rate,
+and render settings scale back automatically on software rasterisers.
 
 ## Art pipeline
 
-Every soldier, building and prop is a voxel model built from cubes in Blender
-and pre-rendered to sprite atlases — the canvas only paints ground, water,
-roads, effects and UI.
+Every soldier, building and prop is a low-poly model assembled from chunky
+masses in Blender and exported as GLB.
 
 ```bash
 python3.11 -m venv .bpyenv && .bpyenv/bin/pip install bpy pillow
-tools/blender/render.sh            # rebuilds assets/ (~40s)
-tools/blender/render.sh units      # troops only
+.bpyenv/bin/python -c "import sys; sys.path.insert(0,'tools/blender/kit'); \
+  import settlement as k; k.build_all('assets/models/settlement', '/tmp/prev')"
+python3 tools/blender/build_manifest.py     # rewrite assets/models/manifest.json
 ```
 
-- `tools/blender/models.py` — the models. Each is a stack of `box()` calls, so
-  editing a unit means moving blocks, not editing a mesh.
-- `tools/blender/lib.py` — the camera rig, palette and render settings. The
-  orthographic camera is set to exactly match the game's projection
-  (`tan(elevation) = 0.68`, pixel aspect `cos(elevation)`), so a rendered frame
-  drops onto the map with no fudge factors: sprites are anchored at the frame
-  centre, which is the model's origin.
-- Troops render 8 facings × 3 poses (stand + two walk frames) per type, once
-  per faction, so faction colour is baked rather than tinted at runtime.
-- Frame sizes and collision footprints are measured from the geometry at render
-  time and written into `assets/props.json`, so growing a model never clips its
-  sprite and the game's obstacles always match what you see.
+- `tools/blender/kit/common.py` — the contract every kit builds against: the
+  scale (1 unit = 10 cm, soldier ~19 units tall), orientation (+X east, +Y
+  north, +Z up, models face +X, origin on the ground at the footprint centre),
+  the shared material palette, and the `box()` / `cyl()` / `wedge()` primitives.
+  Because origins sit on the ground, the game drops an asset at
+  `(x, terrainHeight, y)` with no per-asset fudge.
+- `tools/blender/kit/*.py` — the kits: settlement, industrial, military, nature,
+  units. Each is modular, so a hamlet and a market town share cottages and a
+  foundry and a mine share boilers.
+- The `cloth` material is the faction-colour marker: the runtime bakes it to the
+  owning faction's colour when it flattens the asset.
+- Soldiers must expose parts named `leg_l`, `leg_r`, `arm_l`, `arm_r`, `weapon`
+  (and `hleg_*` for horses) whose origins sit at their pivots — that is the
+  whole animation rig.
+- `preview_render()` renders any asset to a PNG so its silhouette can be
+  inspected before it ships.
 
-The generated atlases are committed, so the game runs without Blender; you only
+The generated GLBs are committed, so the game runs without Blender; you only
 need it to change the art.
 
 ## Tests

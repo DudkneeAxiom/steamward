@@ -62,6 +62,7 @@ MATERIALS = {
     'foliage_b':    (0.25, 0.38, 0.18),
     'foliage_c':    (0.31, 0.42, 0.20),
     'trunk':        (0.28, 0.20, 0.13),
+    'deadwood':     (0.47, 0.42, 0.35),   # weathered bare wood: snags, deadfall
     'grass':        (0.32, 0.42, 0.20),
     'dirt':         (0.36, 0.28, 0.18),
     'crop':         (0.62, 0.55, 0.24),

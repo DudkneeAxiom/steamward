@@ -8,7 +8,7 @@ as one place built by one set of hands:
     door()/window() recessed openings with jambs, sills and shutters
     framing()      timber studs, rails and braces — the variable that makes
                    three cottages look like three cottages, not one thrice
-    solid_roof()   thatch: a fat wedge that wraps the gables (pitched_roof)
+    pitched_roof() thatch: a fat wedge that wraps the gables (from common)
     plane_roof()   tile/slate: two tilted slabs, leaving open gable ends that
                    get their own plastered, timber-framed gable wall
 
@@ -22,7 +22,6 @@ import random
 
 import bpy
 
-import common as c
 from common import (box, cyl, wedge, ramp, empty, clear_scene, export_glb,
                     preview_render, bounds, pitched_roof)
 
@@ -916,14 +915,14 @@ def crop_row():
     box(0, 9.4, 0, 60.0, 3.2, 1.0, 'dirt', g)
     box(0, -9.4, 0, 60.0, 3.2, 1.0, 'dirt', g)
     # the body of the crop in four uneven lengths, so the row is not a slab
-    for i, (w, h) in enumerate(((9.5, 3.0), (10.6, 4.0), (9.0, 3.2), (10.2, 4.3))):
+    for i, (w, h) in enumerate(((9.5, 5.4), (10.6, 6.6), (9.0, 5.8), (10.2, 7.0))):
         box(-22.5 + i * 15.0, rng.uniform(-0.7, 0.7), 1.2, 15.0, w, h, 'crop', g)
     for i in range(18):                                  # stalks breaking the top
         x = -28.0 + i * 3.3
-        h = 5.0 + rng.uniform(0.0, 6.5)
+        h = 4.5 + rng.uniform(0.0, 5.5)
         box(x + rng.uniform(-1.2, 1.2), rng.uniform(-4.4, 4.4),
-            3.4 + rng.uniform(0.0, 1.4), 1.7, 1.7, h, 'crop', g,
-            rot=(rng.uniform(-0.3, 0.3), rng.uniform(-0.3, 0.3),
+            6.0 + rng.uniform(0.0, 1.6), 1.9, 1.9, h, 'crop', g,
+            rot=(rng.uniform(-0.28, 0.28), rng.uniform(-0.28, 0.28),
                  rng.uniform(-0.8, 0.8)))
     return g
 
