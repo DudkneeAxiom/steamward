@@ -23,7 +23,7 @@ export class Gfx {
     this.softwareGL = /swiftshader|llvmpipe|software/i.test(gpuName);
     this.renderer.setPixelRatio(this.softwareGL ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = this.softwareGL ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = this.softwareGL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
 
@@ -56,23 +56,25 @@ export class Gfx {
   _buildLights() {
     // Warm low sun for long readable shadows, cool sky fill so shadowed faces
     // stay legible instead of going black.
-    const sun = new THREE.DirectionalLight(0xffeccc, 2.5);
+    const sun = new THREE.DirectionalLight(0xffeeda, 1.85);
     sun.position.set(-620, 900, 420);
     sun.castShadow = true;
     sun.shadow.mapSize.set(this.softwareGL ? 1024 : 2048, this.softwareGL ? 1024 : 2048);
-    sun.shadow.bias = -0.0016;
-    sun.shadow.normalBias = 1.2;
+    // Shadow acne shows up as a grey checkerboard over open ground; a healthy
+    // normal bias plus a tight depth range is what keeps it away.
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 3.0;
     const c = sun.shadow.camera;
-    c.near = 10; c.far = 3600;
+    c.near = 600; c.far = 2400;
     this.scene.add(sun);
     this.scene.add(sun.target);
     this.sun = sun;
 
-    const sky = new THREE.HemisphereLight(0xbcd4e6, 0x4a4534, 1.05);
+    const sky = new THREE.HemisphereLight(0xa8c4dc, 0x4a4534, 0.62);
     this.scene.add(sky);
     this.hemi = sky;
 
-    const bounce = new THREE.DirectionalLight(0xcfd8e0, 0.35);
+    const bounce = new THREE.DirectionalLight(0xbcc8d4, 0.22);
     bounce.position.set(500, 300, -600);
     this.scene.add(bounce);
   }
@@ -122,7 +124,9 @@ export class Gfx {
     const sc = this.sun.shadow.camera;
     sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span;
     sc.updateProjectionMatrix();
-    this.sun.position.set(this.target.x - 620, 900, this.target.z + 420);
+    // Keep the light a fixed distance from what it lights, so the tight depth
+    // range above always contains the scene.
+    this.sun.position.set(this.target.x - 780, 1140, this.target.z + 530);
     this.sun.target.position.copy(this.target);
     this.sun.target.updateMatrixWorld();
 

@@ -91,7 +91,7 @@ export class WorldView {
   build(campaign) {
     const gfx = this.gfx;
     gfx.clear();
-    gfx.setSkyMood({ background: 0x93aec0, haze: 0.85, sunIntensity: 2.6, skyLight: 1.0 });
+    gfx.setSkyMood({ background: 0x93aec0, haze: 0.85, sunIntensity: 1.85, skyLight: 0.62 });
 
     this.hf = buildWorldHeightfield({
       w: WORLD.w, h: WORLD.h, cell: 26, seed: 20260811,
@@ -372,7 +372,7 @@ export class WorldView {
     let disc = this.ownerDiscs.get(loc.key);
     if (!disc) {
       disc = new THREE.Mesh(
-        new THREE.RingGeometry(96, 116, 40),
+        new THREE.RingGeometry(104, 112, 44),
         new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide }),
       );
       disc.rotation.x = -Math.PI / 2;
@@ -434,7 +434,7 @@ export class WorldView {
       const disc = this.ownerDisc(loc);
       const fac = FACTIONS[loc.owner] || FACTIONS.neutral;
       disc.material.color.set(fac.color);
-      disc.material.opacity = loc.owner === 'neutral' ? 0.18 : 0.42;
+      disc.material.opacity = loc.owner === 'neutral' ? 0.12 : 0.34;
       disc.position.set(loc.x, this.heightAt(loc.x, loc.y) + 1.2, loc.y);
       const r = loc.type === 'keep' ? 1.7 : loc.type === 'fort' ? 1.35 : 1;
       disc.scale.setScalar(r);

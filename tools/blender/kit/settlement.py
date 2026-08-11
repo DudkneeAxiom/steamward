@@ -177,7 +177,7 @@ def framing(parent, side, v, bays, z, h, style, s=2.6, off=1.0,
                 bar(parent, side, v, off, um + 0.5, z + h - k - 1, um + k, z + h - 1, s, material, out=s + 0.6)
 
 
-def door_hood(parent, side, v, u, z, w=17.0, out=8.0):
+def door_hood(parent, side, v, u, z, w=17.0, out=8.0, cover='timber'):
     """A hood on brackets over a doorway: it keeps the rain off the threshold,
     and it stops the door disappearing into the shadow under deep eaves."""
     put = face(parent, side, v)
@@ -185,7 +185,7 @@ def door_hood(parent, side, v, u, z, w=17.0, out=8.0):
         put(u + sgn * (w / 2.0 - 1.6), out / 2.0, z - 5.0, 2.4, out, 5.0, 'timber')
         put(u + sgn * (w / 2.0 - 1.6), out - 1.4, z - 9.0, 2.2, 2.6, 4.0, 'timber')
     put(u, out / 2.0 + 0.5, z, w + 3.0, out + 2.0, 2.6, 'timber')
-    put(u, out / 2.0 + 0.5, z + 2.6, w + 1.0, out, 1.8, 'roof_tile')
+    put(u, out / 2.0 + 0.5, z + 2.6, w + 1.0, out, 1.8, cover)
 
 
 def door(parent, side, v, u, z, w=11.0, h=18.0, thick=3.6, step=True,
@@ -215,7 +215,8 @@ def window(parent, side, v, u, z, w=8.0, h=8.0, thick=3.6, shutters=False,
     """Recessed light with a timber frame, mullion bars and a jutting sill."""
     put = face(parent, side, v)
     put(u, -thick / 2.0 + 0.6, z, w, 1.2, h, 'soot')                 # dark interior
-    put(u, thick / 2.0 - 1.2, z, w - 1.2, 0.8, h - 0.6, 'iron_dark')  # leaded glazing
+    if mullions > 1:                                     # leaded lights, big window
+        put(u, thick / 2.0 - 1.2, z, w - 1.2, 0.8, h - 0.6, 'iron_dark')
     for sgn in (-1, 1):
         put(u + sgn * (w / 2.0 + 0.8), 0.7, z - 0.6, 1.8, thick + 1.4, h + 1.8, 'timber')
     put(u, 0.7, z + h, w + 3.6, thick + 1.4, 1.8, 'timber')
@@ -336,7 +337,7 @@ def sack(parent, x, y, z, s=6.0, rz=0.0, material='thatch'):
 
 
 def ladder(parent, x, y, z, height, lean=R(12), rungs=5, axis='x', sgn=-1,
-           w=8.0, s=1.5):
+           w=8.0, s=1.9):
     """A leaning ladder: its top is at (x, y, z+height), its foot kicked out
     by `sgn` along `axis`."""
     run = height * math.tan(lean)
@@ -416,11 +417,9 @@ def cottage_b():
     main_holes = {
         'w': [(-8.0, 8.0, 15.0, 22.0), (14.0, 8.0, 15.0, 22.0), (2.0, 7.0, 3.0, 9.5)],
         'n': [(MX - 8.0, 8.0, 15.0, 22.0)],
-        's': [(MX + 6.0, 8.0, 15.0, 22.0)],
     }
     wing_holes = {
         'e': [(-1.0, 11.0, 0.0, 18.0), (13.0, 7.0, 15.0, 21.0)],
-        'n': [(CX + 4.0, 9.0, 15.0, 21.5)],
         's': [(CX - 3.0, 8.0, 4.0, 10.0)],
     }
     # stone to the mid rail, plaster and timber above
@@ -429,14 +428,12 @@ def cottage_b():
     box(MX, 0, z, MW + 2.0, MD + 2.0, 3.0, 'stone_light', g)      # plinth course
     box(CX, 0, z, CW + 2.0, CD + 2.0, 3.0, 'stone_light', g)
     door(g, 'e', CX + CW / 2.0 - T / 2.0, -1.0, z, 11.0, 18.0, T, ground=0.0)
-    door_hood(g, 'e', CX + CW / 2.0 - T / 2.0, -1.0, z + 21.0, 18.0, 9.0)
+    door_hood(g, 'e', CX + CW / 2.0 - T / 2.0, -1.0, z + 21.0, 18.0, 9.0, 'roof_tile')
     window(g, 'e', CX + CW / 2.0 - T / 2.0, 13.0, z + 15.0, 7.0, 6.0, T, shutters=True)
     window(g, 'w', MX - MW / 2.0 + T / 2.0, -8.0, z + 15.0, 8.0, 7.0, T, mullions=2)
     window(g, 'w', MX - MW / 2.0 + T / 2.0, 14.0, z + 15.0, 8.0, 7.0, T, mullions=2)
     window(g, 'w', MX - MW / 2.0 + T / 2.0, 2.0, z + 3.0, 7.0, 6.5, T)
     window(g, 'n', MD / 2.0 - T / 2.0, MX - 8.0, z + 15.0, 8.0, 7.0, T, mullions=2)
-    window(g, 's', -MD / 2.0 + T / 2.0, MX + 6.0, z + 15.0, 8.0, 7.0, T)
-    window(g, 'n', CD / 2.0 - T / 2.0, CX + 4.0, z + 15.0, 9.0, 6.5, T, mullions=2)
     window(g, 's', -CD / 2.0 + T / 2.0, CX - 3.0, z + 4.0, 8.0, 6.0, T)
 
     band(g, MX, 0, z + stone_h, MW, MD, 2.6, 'timber')
@@ -450,14 +447,12 @@ def cottage_b():
             up_z, up_h, 'cross')
     framing(g, 'n', MD / 2.0 - T / 2.0, [(MX - 18.0, MX - 13.0), (MX - 3.0, MX + 17.0)],
             up_z, up_h, 'cross')
-    framing(g, 's', -MD / 2.0 + T / 2.0, [(MX - 18.0, MX + 1.0), (MX + 11.0, MX + 17.0)],
-            up_z, up_h, 'cross')
+    framing(g, 's', -MD / 2.0 + T / 2.0, [(MX - 18.0, MX + 17.0)], up_z, up_h, 'cross')
     framing(g, 'e', CX + CW / 2.0 - T / 2.0, [(4.0, 9.0), (-16.0, -8.0)], up_z, up_h, 'cross')
     framing(g, 'n', CD / 2.0 - T / 2.0, [(CX - 12.0, CX - 1.0)], up_z, up_h, 'cross')
 
     # main range roof: ridge along Y, open gables
     rz = z + h
-    rafter_tails(g, MX, 0, rz - 1.0, MD - 8, MW, 7, ridge='y')
     plane_roof(g, MX, 0, rz, MW, MD, 16.5, 'roof_tile', overhang=3.5, ridge='y')
     for sy, side in ((1, 'n'), (-1, 's')):
         gv = sy * (MD / 2.0 - T / 2.0)
@@ -467,7 +462,6 @@ def cottage_b():
 
     # cross wing roof: ridge along X, lower, tucking into the main slope
     wz = z + h - 3.0
-    rafter_tails(g, CX, 0, wz - 1.0, CW - 6, CD, 5, ridge='x')
     plane_roof(g, CX, 0, wz, CW, CD, 12.5, 'roof_tile', overhang=3.5, ridge='x')
     gv = CX + CW / 2.0 - T / 2.0
     gable(g, gv, 0, wz, CD, 12.5, T, 'plaster', ridge='x')
@@ -578,7 +572,7 @@ def longhouse():
     framing(g, 's', -D / 2.0 + T / 2.0, [(-22.0, -6.0), (6.0, 22.0)], up_z, up_h, 'chevron')
 
     rz = z + h
-    rafter_tails(g, 0, 0, rz - 1.0, D - 10, W, 12, ridge='y')
+    rafter_tails(g, 0, 0, rz - 1.0, D - 10, W, 8, ridge='y')
     plane_roof(g, 0, 0, rz, W, D, 21.0, 'roof_tile', overhang=5.0, ridge='y')
     for sy, side in ((1, 'n'), (-1, 's')):
         gv = sy * (D / 2.0 - T / 2.0)
@@ -693,7 +687,7 @@ def storehouse():
 
     band(g, 0, 0, z + h - 3.4, W, D, 3.4, 'timber')
     rz = z + h
-    rafter_tails(g, 0, 0, rz - 1.2, D - 12, W, 12, ridge='y', s=2.6, depth=7.0)
+    rafter_tails(g, 0, 0, rz - 1.2, D - 12, W, 8, ridge='y', s=2.6, depth=7.0)
     plane_roof(g, 0, 0, rz, W, D, 26.0, 'thatch', overhang=4.5, ridge='y',
                thick=4.2, cap='thatch')
     box(0, 0, rz + 24.0, 8.0, D + 9.0, 3.4, 'thatch', g)          # ridge roll
@@ -717,7 +711,7 @@ def well():
     cyl(0, 0, 8.5, 11.8, 1.6, 'stone', g, verts=12)
     cyl(0, 0, 8.2, 8.6, 0.6, 'soot', g, verts=12)
     for a in (0.3, 1.6, 2.9, 4.3, 5.6):                 # a rough, hand-laid ring
-        cyl(math.cos(a) * 10.6, math.sin(a) * 10.6, 8.4, 2.6, 2.0, 'stone_light',
+        cyl(math.cos(a) * 10.6, math.sin(a) * 10.6, 8.4, 2.4, 1.9, 'stone_dark',
             g, verts=6)
 
     for sy in (-1, 1):                                   # frame
@@ -755,7 +749,7 @@ def market_stall():
         box(OX + 11.0, sy * 12.5, 0, 3.8, 3.8, 22.0, 'timber', g)
         bar(g, 'n', sy * 12.5, 0.0, OX - 13.0, 22.0, OX - 5.0, 26.5, 2.2, 'timber')
     box(OX - 13.0, 0, 26.5, 4.2, 29.0, 3.0, 'timber', g)      # back plate
-    box(OX + 11.0, 0, 19.5, 4.2, 29.0, 3.0, 'timber', g)      # front plate
+    box(OX + 11.0, 0, 17.5, 4.2, 29.0, 3.0, 'timber', g)      # front plate
 
     # counter: trestles, boards, skirt — pushed forward of the awning's shadow
     for sy in (-1, 1):
@@ -774,14 +768,12 @@ def market_stall():
         m = 'cloth' if i % 2 == 0 else 'canvas'
         box(OX - 2.0, y, 26.5 - drop / 2.0 - 0.7, L, 4.9, 1.5, m, g, rot=(0, th, 0))
     box(OX + 10.0, 0, 20.0, 2.6, 29.0, 2.2, 'timber', g)      # awning bar
-    for sy in (-1, 1):                                        # its props
-        bar(g, 'n', sy * 13.5, 0.0, OX + 10.0, 20.0, OX + 2.0, 24.5, 2.2, 'timber')
 
     # hanging cloth at the back, and the goods laid out on the boards
     box(OX - 11.4, 0, 5.0, 1.0, 24.0, 16.0, 'cloth', g)
     crate(g, OX + 4.0, -9.0, 13.8, 9.0, 8.0, 6.5, R(8))
     crate(g, OX + 3.5, 9.0, 13.8, 8.0, 8.0, 5.5, R(-6))
-    crate(g, OX + 4.0, -8.5, 20.3, 7.0, 6.5, 5.0, R(-13))
+    crate(g, OX - 6.0, 9.5, 13.8, 8.0, 7.5, 6.0, R(-13))
     sack(g, OX + 9.0, 1.0, 13.8, 6.0, R(14))
     sack(g, OX + 9.5, -5.5, 13.8, 5.2, R(-20))
     barrel(g, OX - 6.0, -14.0, 0, 4.6, 9.5)
@@ -907,11 +899,11 @@ def log_pile():
                      yaw=rng.uniform(-0.035, 0.035))
     for sx in (-1, 1):
         for sy in (-1, 1):
-            box(sx * 18.5, sy * 12.5, 0, 2.6, 2.6, 22.0, 'timber', g,
+            box(sx * 18.5, sy * 12.5, 0, 2.6, 2.6, 19.0, 'timber', g,
                 rot=(sy * -0.06, 0, 0))
-    cyl(24.0, 12.0, 0, 6.0, 9.0, 'trunk', g, verts=8)
-    box(24.0, 12.0, 9.0, 1.6, 1.6, 9.0, 'timber_light', g, rot=(0, R(14), 0))
-    box(22.6, 12.0, 16.4, 4.4, 1.4, 3.4, 'steel', g, rot=(0, R(14), 0))
+    cyl(24.0, 12.0, 0, 6.0, 9.0, 'trunk', g, verts=8)          # chopping block
+    box(24.0, 12.0, 9.0, 1.6, 1.6, 8.0, 'timber_light', g, rot=(0, R(16), 0))
+    box(22.9, 12.0, 15.6, 3.4, 1.5, 2.8, 'iron', g, rot=(0, R(16), 0))
     return g
 
 
@@ -924,15 +916,15 @@ def crop_row():
     box(0, 9.4, 0, 60.0, 3.2, 1.0, 'dirt', g)
     box(0, -9.4, 0, 60.0, 3.2, 1.0, 'dirt', g)
     # the body of the crop in four uneven lengths, so the row is not a slab
-    for i, (w, h) in enumerate(((11.5, 4.0), (12.5, 5.2), (11.0, 4.4), (12.2, 5.6))):
-        box(-22.5 + i * 15.0, rng.uniform(-0.6, 0.6), 1.4, 15.0, w, h, 'crop', g)
-    for i in range(22):                                  # stalks breaking the top
-        x = -28.0 + i * 2.67
-        h = 4.5 + rng.uniform(0.0, 6.0)
-        box(x + rng.uniform(-0.8, 0.8), rng.uniform(-4.6, 4.6),
-            4.6 + rng.uniform(0.0, 1.6), 1.9, 1.9, h, 'crop', g,
-            rot=(rng.uniform(-0.22, 0.22), rng.uniform(-0.22, 0.22),
-                 rng.uniform(-0.7, 0.7)))
+    for i, (w, h) in enumerate(((9.5, 3.0), (10.6, 4.0), (9.0, 3.2), (10.2, 4.3))):
+        box(-22.5 + i * 15.0, rng.uniform(-0.7, 0.7), 1.2, 15.0, w, h, 'crop', g)
+    for i in range(18):                                  # stalks breaking the top
+        x = -28.0 + i * 3.3
+        h = 5.0 + rng.uniform(0.0, 6.5)
+        box(x + rng.uniform(-1.2, 1.2), rng.uniform(-4.4, 4.4),
+            3.4 + rng.uniform(0.0, 1.4), 1.7, 1.7, h, 'crop', g,
+            rot=(rng.uniform(-0.3, 0.3), rng.uniform(-0.3, 0.3),
+                 rng.uniform(-0.8, 0.8)))
     return g
 
 
@@ -1018,6 +1010,35 @@ ASSETS = {
 }
 
 
+def merge_by_material(root):
+    """Join an asset's boxes into one mesh per material. Geometry and colour
+    are identical; what changes is that a cottage ships as ~6 nodes instead of
+    ~200, which is the difference between 6 draw calls and 200 in a browser."""
+    groups = {}
+    stack = [root]
+    while stack:
+        ob = stack.pop()
+        stack.extend(ob.children)
+        if ob.type == 'MESH' and ob.data.materials:
+            groups.setdefault(ob.data.materials[0].name, []).append(ob)
+    for name, obs in groups.items():
+        # join into a fresh host with an identity transform: joining into one
+        # of the boxes would leave the merged mesh carrying that box's
+        # rotation and non-uniform scale, which throws bounds() right off
+        host = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+        bpy.context.collection.objects.link(host)
+        host.parent = root
+        host.data.materials.append(obs[0].data.materials[0])
+        bpy.ops.object.select_all(action='DESELECT')
+        for o in obs:
+            o.select_set(True)
+        host.select_set(True)
+        bpy.context.view_layer.objects.active = host
+        bpy.ops.object.join()
+    bpy.ops.object.select_all(action='DESELECT')
+    return root
+
+
 def tri_count(root):
     n = 0
     stack = [root]
@@ -1030,13 +1051,15 @@ def tri_count(root):
     return n
 
 
-def build_all(out_dir, preview_dir=None, only=None):
+def build_all(out_dir, preview_dir=None, only=None, merge=True):
     names = [n for n in ASSETS if not only or n in only]
     report = []
     for name in names:
         clear_scene()
         root = ASSETS[name]()
         root.name = name
+        if merge:
+            merge_by_material(root)
         tris = tri_count(root)
         w, d, h = bounds(root)
         export_glb(root, os.path.join(out_dir, name + '.glb'))

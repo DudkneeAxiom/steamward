@@ -95,6 +95,9 @@ export class Heightfield {
     this.rows = Math.ceil((h + margin * 2) / cell) + 1;
     this.height = new Float32Array(this.cols * this.rows);
     this.biome = new Uint8Array(this.cols * this.rows);
+    // 0..1 industrial staining, blended in the mesher so a works site darkens
+    // its ground smoothly instead of switching cell by cell
+    this.stain = new Float32Array(this.cols * this.rows);
   }
   // world position of grid sample (i, j)
   wx(i) { return this.ox + i * this.cell; }
@@ -125,6 +128,35 @@ export class Heightfield {
 }
 
 const quantise = (h) => Math.round(h / STEP) * STEP;
+
+/**
+ * Blur the heightfield before quantising. Without this, neighbouring cells
+ * land on different steps almost everywhere and the map becomes a staircase of
+ * thin cliff faces instead of broad terraces with occasional real drops.
+ */
+function smoothField(hf, passes = 3) {
+  const { cols, rows } = hf;
+  let src = hf.height;
+  let dst = new Float32Array(src.length);
+  for (let p = 0; p < passes; p++) {
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        let sum = 0, n = 0;
+        for (let dj = -1; dj <= 1; dj++) {
+          for (let di = -1; di <= 1; di++) {
+            const ii = clamp(i + di, 0, cols - 1), jj = clamp(j + dj, 0, rows - 1);
+            const w = (di === 0 && dj === 0) ? 4 : 1;
+            sum += src[jj * cols + ii] * w;
+            n += w;
+          }
+        }
+        dst[j * cols + i] = sum / n;
+      }
+    }
+    const t = src; src = dst; dst = t;
+  }
+  if (src !== hf.height) hf.height.set(src);
+}
 
 // Distance to a polyline, used for rivers and roads.
 function polyDist(x, y, pts) {
@@ -182,8 +214,10 @@ export function buildWorldHeightfield(spec) {
       }
       if (riverT < 0.12) h = Math.max(h, WATER_LEVEL + 12);
 
+      // Ground material is decided in a second pass from the finished terrain;
+      // guessing it here (before platforms, roads and terracing) is what made
+      // the map look mottled.
       let biome = BIOME.grass;
-      if (h > 165) biome = BIOME.rock;
 
       // Farmland is worked flat-ish.
       for (const f of spec.farms) {
@@ -215,7 +249,9 @@ export function buildWorldHeightfield(spec) {
         const t = smoothstep(r * 1.5, r * 0.75, d);
         const k = j * hf.cols + i;
         hf.height[k] = hf.height[k] * (1 - t) + level * t;
-        if (t > 0.5 && (loc.type === 'coal' || loc.type === 'foundry')) hf.biome[k] = BIOME.soot;
+        if (loc.type === 'coal' || loc.type === 'foundry') {
+          hf.stain[k] = Math.max(hf.stain[k], smoothstep(r * 1.7, r * 0.5, d));
+        }
       }
     }
   }
@@ -237,8 +273,9 @@ export function buildWorldHeightfield(spec) {
     }
   }
 
-  // Terrace it. Settlement platforms and roads keep their exact level so
-  // buildings never straddle a step.
+  // Terrace it. Settlement platforms keep their exact level so buildings never
+  // straddle a step.
+  smoothField(hf, 3);
   for (let k = 0; k < hf.height.length; k++) {
     hf.height[k] = Math.max(WATER_LEVEL - 18, quantise(hf.height[k]));
   }
@@ -250,6 +287,23 @@ export function buildWorldHeightfield(spec) {
       }
     }
   }
+  // Final material pass: authored ground (road, farm, sand) wins; everything
+  // else is grass until the ground is genuinely steep or high, which is what
+  // makes highlands read as highlands.
+  for (let j = 0; j < hf.rows; j++) {
+    for (let i = 0; i < hf.cols; i++) {
+      const k = j * hf.cols + i;
+      const b = hf.biome[k];
+      if (b === BIOME.road || b === BIOME.farm || b === BIOME.sand) continue;
+      const here = hf.height[k];
+      let maxDrop = 0;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        maxDrop = Math.max(maxDrop, Math.abs(here - hf.height[hf.idx(i + di, j + dj)]));
+      }
+      hf.biome[k] = (here > 190 || maxDrop >= STEP * 2.5) ? BIOME.rock : BIOME.grass;
+    }
+  }
+
   hf.platforms = platforms;
   return hf;
 }
@@ -294,7 +348,8 @@ export function buildBattleHeightfield(kind, seed, w, h) {
         }
       }
       if (kind === 'industrial') {
-        biome = Math.abs(fbm(detail, x, y, 2, 0.004)) > 0.18 ? BIOME.soot : BIOME.dirt;
+        biome = BIOME.dirt;
+        hf.stain[j * hf.cols + i] = clamp(0.35 + fbm(detail, x, y, 2, 0.004) * 1.6, 0, 0.9);
         ht = ht * 0.7 + 12;                      // worked flat for machinery
       }
       if (kind === 'settlement') {
@@ -323,6 +378,7 @@ export function buildBattleHeightfield(kind, seed, w, h) {
     }
   }
 
+  smoothField(hf, 2);
   for (let k = 0; k < hf.height.length; k++) {
     hf.height[k] = Math.max(WATER_LEVEL - 20, quantise(hf.height[k]));
   }
@@ -343,6 +399,7 @@ export function buildTerrainMesh(hf) {
 
   const H = (i, j) => hf.height[hf.idx(i, j)];
   const B = (i, j) => hf.biome[hf.idx(i, j)];
+  const S = (i, j) => hf.stain[hf.idx(i, j)];
 
   const pushTri = (ax, ay, az, bx, by, bz, cx, cy, cz, nx, ny, nz, col) => {
     positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
@@ -350,11 +407,17 @@ export function buildTerrainMesh(hf) {
     for (let i = 0; i < 3; i++) colors.push(col[0], col[1], col[2]);
   };
 
-  const shade = (biome, height, jitter) => {
+  const SOOT = BIOME_COLOR[BIOME.soot];
+  const shade = (biome, height, jitter, stain) => {
     const base = BIOME_COLOR[biome] || BIOME_COLOR[BIOME.grass];
-    // higher ground dries out; a little per-cell variation stops it reading flat
-    const k = 1 + jitter * 0.09 + clamp((height - 60) / 420, -0.05, 0.12);
-    return [clamp(base[0] * k, 0, 1), clamp(base[1] * k, 0, 1), clamp(base[2] * k, 0, 1)];
+    // higher ground dries out; slight per-cell variation stops it reading flat,
+    // kept small so the ground never turns into a checkerboard
+    const k = 1 + jitter * 0.045 + clamp((height - 60) / 520, -0.04, 0.09);
+    const out = [base[0] * k, base[1] * k, base[2] * k];
+    if (stain > 0.01) {
+      for (let i = 0; i < 3; i++) out[i] = out[i] * (1 - stain) + SOOT[i] * stain;
+    }
+    return [clamp(out[0], 0, 1), clamp(out[1], 0, 1), clamp(out[2], 0, 1)];
   };
 
   for (let j = 0; j < rows; j++) {
@@ -363,7 +426,7 @@ export function buildTerrainMesh(hf) {
       const z0 = hf.wy(j), z1 = z0 + cell;
       const y = H(i, j);
       const jitter = ((i * 73856093) ^ (j * 19349663)) % 7 / 7 - 0.5;
-      const col = shade(B(i, j), y, jitter);
+      const col = shade(B(i, j), y, jitter, S(i, j));
       // top face (two tris, y-up)
       pushTri(x0, y, z0, x0, y, z1, x1, y, z1, 0, 1, 0, col);
       pushTri(x0, y, z0, x1, y, z1, x1, y, z0, 0, 1, 0, col);

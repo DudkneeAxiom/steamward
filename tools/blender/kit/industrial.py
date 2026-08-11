@@ -739,14 +739,16 @@ def mine_headframe():
     WHEEL = (-13.0, 73.0)
 
     # shaft collar: timber baulks around a black hole
-    bx(0, 0, 0, 36, 36, 3.0, 'timber_light', R)
-    bx(0, 0, 3.0, 27, 27, 0.8, 'soot', R)
-    for sx in (-1, 1):
-        bx(sx * 16.0, 0, 3.0, 5.0, 36, 4.5, 'timber', R)
-        bx(0, sx * 16.0, 3.0, 36, 5.0, 4.5, 'timber', R)
+    for sd in (-1, 1):                                               # bank
+        bx(sd * 15.0, 0, 0, 10, 40, 4.5, 'timber_light', R)
+        bx(0, sd * 15.0, 0, 40, 10, 4.5, 'timber_light', R)
+    bx(0, 0, 0, 22, 22, 1.2, 'soot', R)                              # the shaft
+    for sd in (-1, 1):
+        bx(sd * 19.0, 0, 0, 4.5, 42, 7.0, 'timber', R)               # collar
+        bx(0, sd * 19.0, 0, 42, 4.5, 7.0, 'timber', R)
     for sx in (-1, 1):
         for sy in (-1, 1):
-            bx(sx * 15.5, sy * 15.5, 7.5, 6.0, 6.0, 3.0, 'timber', R)
+            bx(sx * 18.5, sy * 18.5, 7.0, 6.0, 6.0, 3.5, 'timber', R)
 
     # front legs lean over the shaft, back rakers take the winder's pull
     for sy in (-1, 1):
@@ -771,18 +773,18 @@ def mine_headframe():
          verts=6)
 
     # ropes: one plumb down the shaft to the cage, one back to the winder
-    tube((0, 0, WHEEL[1] - 0.5), (0, 0, 20.0), 0.9, 'iron_dark', R, verts=6)
+    tube((0, 0, WHEEL[1] - 0.5), (0, 0, 20.5), 0.9, 'iron_dark', R, verts=6)
     tube((-26, 0, WHEEL[1] - 0.5), (-56, 0, 22.0), 0.9, 'iron_dark', R, verts=6)
 
     # cage standing at bank
-    bx(0, 0, 4.0, 13, 13, 1.6, 'timber_light', R)
+    bx(0, 0, 4.5, 12, 12, 1.6, 'timber_light', R)
     for sx in (-1, 1):
         for sy in (-1, 1):
-            bx(sx * 5.6, sy * 5.6, 4.0, 1.8, 1.8, 15, 'iron_dark', R)
+            bx(sx * 5.2, sy * 5.2, 4.5, 1.8, 1.8, 15, 'iron_dark', R)
     for sy in (-1, 1):
-        bx(0, sy * 6.0, 8.0, 13, 1.2, 6.0, 'iron_dark', R)
-    bx(0, 0, 19.0, 14, 14, 1.6, 'iron_dark', R)
-    bx(0, 0, 20.6, 4.0, 4.0, 2.4, 'iron_dark', R)
+        bx(0, sy * 5.6, 8.5, 12, 1.2, 6.0, 'iron_dark', R)
+    bx(0, 0, 19.5, 13, 13, 1.6, 'iron_dark', R)
+    bx(0, 0, 21.1, 4.0, 4.0, 2.4, 'iron_dark', R)
 
     # steam winder: drum with rope, engine, engine house
     bx(-56, 0, 0, 26, 30, 6, 'stone', R)
@@ -885,17 +887,15 @@ def ore_cart():
     _calibrate()
     R = C.empty('ore_cart')
     bx(0, 0, 0, 46, 24, 1.6, 'dirt', R)
-    for i in range(5):
-        bx(-16 + i * 8, 0, 1.6, 3.6, 19, 2.0, 'timber_light', R)
+    for i in range(4):
+        bx(-15 + i * 10, 0, 1.6, 3.6, 19, 2.0, 'timber_light', R)
     for sy in (-1, 1):
         bx(0, sy * 5.4, 3.6, 46, 1.7, 1.5, 'steel', R)
     WZ = 8.3
-    for sx in (-1, 1):                                               # small
-        for sy in (-1, 1):                                           # wheels:
-            ring((sx * 7.0, sy * 5.4, WZ), (0, 1, 0), 3.2, 1.7,      # plain
-                 'iron_dark', R)                                     # discs
-            ring((sx * 7.0, sy * 6.4, WZ), (0, 1, 0), 1.3, 1.0, 'steel', R,
-                 verts=6)
+    for sx in (-1, 1):                             # wheels stay plain discs —
+        for sy in (-1, 1):                         # spokes cannot read at this
+            ring((sx * 7.0, sy * 5.4, WZ), (0, 1, 0), 3.2, 1.7,   # size anyway
+                 'iron_dark', R)
         tube((sx * 7.0, -6.6, WZ), (sx * 7.0, 6.6, WZ), 0.9, 'steel', R, verts=6)
     bx(0, 0, 10.2, 23, 12, 2.4, 'iron', R)                           # chassis
     # tub: panels flared outward at the rim, not a plain box
@@ -920,7 +920,7 @@ def ore_cart():
     tube((0, -8.2, 13.4), (0, 8.2, 13.4), 1.3, 'steel', R, verts=6)
     bx(-12.6, 0, 11.5, 2.4, 9.0, 8.0, 'iron_dark', R)                # push handle
     bx(-14.2, 0, 18.0, 5.0, 9.0, 2.2, 'iron_dark', R)
-    coal_lumps(R, 0, 0, 19.5, 6, 6, 4, seed=41)
+    coal_lumps(R, 0, 0, 19.5, 4, 6, 4, seed=41)
     _recentre(R)
     return R
 
