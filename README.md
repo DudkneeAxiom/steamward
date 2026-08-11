@@ -121,11 +121,14 @@ src/strategic.js           strategic sim: movement, AI, captures, encounters
 src/battle.js              tactical sim: A* grid, formations, combat, morale
 src/strategicRender.js     map rendering (2.5D diorama projection)
 src/battleRender.js        battlefield rendering, particles
+src/sprites.js             voxel atlas loading and blitting
 src/camera.js              shared squashed-Y camera
 src/ui.js                  panels, dialogs, alerts, battle HUD
 src/soldiers.js            persistent soldier records, XP, promotions
 src/audio.js               fully procedural WebAudio SFX, ambience and score
 src/names.js, src/util.js  naming, math, seeded RNG
+assets/                    generated sprite atlases (checked in)
+tools/blender/             the Blender scripts that generate them
 ```
 
 The 2.5D look comes from a Y-squashed camera (`y × 0.68`) with upright sprites,
@@ -133,6 +136,34 @@ painter's-algorithm depth sort and per-entity height offsets. Battles run on a
 coarse A* grid with line-of-sight path smoothing plus local separation forces;
 unit AI updates are staggered and neighbor queries use a spatial hash, so 40v40
 stays comfortably within frame budget.
+
+## Art pipeline
+
+Every soldier, building and prop is a voxel model built from cubes in Blender
+and pre-rendered to sprite atlases — the canvas only paints ground, water,
+roads, effects and UI.
+
+```bash
+python3.11 -m venv .bpyenv && .bpyenv/bin/pip install bpy pillow
+tools/blender/render.sh            # rebuilds assets/ (~40s)
+tools/blender/render.sh units      # troops only
+```
+
+- `tools/blender/models.py` — the models. Each is a stack of `box()` calls, so
+  editing a unit means moving blocks, not editing a mesh.
+- `tools/blender/lib.py` — the camera rig, palette and render settings. The
+  orthographic camera is set to exactly match the game's projection
+  (`tan(elevation) = 0.68`, pixel aspect `cos(elevation)`), so a rendered frame
+  drops onto the map with no fudge factors: sprites are anchored at the frame
+  centre, which is the model's origin.
+- Troops render 8 facings × 3 poses (stand + two walk frames) per type, once
+  per faction, so faction colour is baked rather than tinted at runtime.
+- Frame sizes and collision footprints are measured from the geometry at render
+  time and written into `assets/props.json`, so growing a model never clips its
+  sprite and the game's obstacles always match what you see.
+
+The generated atlases are committed, so the game runs without Blender; you only
+need it to change the art.
 
 ## Tests
 

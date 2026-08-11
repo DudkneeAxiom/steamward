@@ -1,0 +1,20 @@
+{
+ "cell": [
+  60,
+  98
+ ],
+ "facings": 8,
+ "poses": 3,
+ "ppu": 4.0,
+ "rows": [
+  "levy",
+  "spearman",
+  "shieldman",
+  "bowman",
+  "pressurebow",
+  "hero",
+  "rider",
+  "boilerlancer",
+  "banner"
+ ]
+}

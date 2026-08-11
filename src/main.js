@@ -12,6 +12,7 @@ import * as UI from './ui.js';
 import { initAudio, resumeAudio, sfx, consumeEffectsAudio, toggleMusic } from './audio.js';
 import { makeCamera } from './camera.js';
 import { fitForDuty, promotionOptions, isVeteran } from './soldiers.js';
+import { loadSprites } from './sprites.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -136,9 +137,16 @@ function enterBattle(bctx, meta) {
   resetBattleFx();
   mode = 'battle';
   cam.bounds = { w: battle.w, h: battle.h };
-  const heroU = Battle.heroUnit(battle);
-  cam.zoom = 1.0;
-  cam.centerOn(heroU ? heroU.x + 160 : battle.w * 0.3, heroU ? heroU.y : battle.h / 2);
+  // Open on a frame that holds both battle lines: the player should read the
+  // whole tactical problem before giving the first order.
+  const xs = battle.units.map(u => u.x), ys = battle.units.map(u => u.y);
+  const minX = Math.min(...xs) - 160, maxX = Math.max(...xs) + 160;
+  const minY = Math.min(...ys) - 120, maxY = Math.max(...ys) + 120;
+  const fit = Math.min(canvas.width / (maxX - minX), canvas.height / ((maxY - minY) * 0.68));
+  // Never zoom out so far that soldiers stop being readable, even if that
+  // means the far flank starts just off screen.
+  cam.zoom = clamp(fit, 0.78, 1.15);
+  cam.centerOn((minX + maxX) / 2, (minY + maxY) / 2);
   UI.setScreen('battle');
   UI.updateTutor(campaign, 'battle');
 }
@@ -725,4 +733,13 @@ window.SW = {
 // ---------------------------------------------------------------- boot
 
 UI.setScreen('menu', Campaign.hasSave());
-requestAnimationFrame(frame);
+UI.setBooting(true);
+loadSprites()
+  .catch(err => {
+    // The game still plays with placeholder figures rather than not at all.
+    console.error('sprite atlases failed to load', err);
+  })
+  .finally(() => {
+    UI.setBooting(false);
+    requestAnimationFrame(frame);
+  });

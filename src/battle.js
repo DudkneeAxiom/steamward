@@ -3,6 +3,7 @@
 
 import { TUNE, UNIT_TYPES } from './data.js';
 import { fitForDuty, isVeteran } from './soldiers.js';
+import { propSize } from './sprites.js';
 import { clamp, dist, dist2, makeRng, angleLerp } from './util.js';
 
 const W = TUNE.battleW, H = TUNE.battleH, CELL = TUNE.cell;
@@ -11,10 +12,16 @@ const GW = Math.ceil(W / CELL), GH = Math.ceil(H / CELL);
 // ---------------------------------------------------------------- terrain generation
 
 function genTerrain(kind, rng, defendingSide) {
-  // Obstacles: circles {x,y,r,kind} and rects {x,y,w,h,kind}. Hills are soft zones (no blocking).
+  // Obstacles: circles {x,y,r,kind} and rects {x,y,w,h,kind}. Hills are soft
+  // zones (no blocking). Blocking sizes come from the sprites' own footprints
+  // so what you see is what units actually collide with.
   const circles = [], rects = [], hills = [], decals = [];
-  const tree = (x, y) => circles.push({ x, y, r: rng.float(14, 22), kind: 'tree' });
-  const rock = (x, y) => circles.push({ x, y, r: rng.float(10, 16), kind: 'rock' });
+  const foot = (name, frac) => Math.max(6, propSize(name).w * frac / 2);
+  const tree = (x, y) => {
+    const sprite = rng.chance(0.5) ? 'tree_pine' : 'tree_round';
+    circles.push({ x, y, r: foot(sprite, 0.62), kind: 'tree', sprite });
+  };
+  const rock = (x, y) => circles.push({ x, y, r: foot('rock', 0.8), kind: 'rock', sprite: 'rock' });
 
   const scatter = (n, fn, minX = 120, maxX = W - 120) => {
     for (let i = 0; i < n; i++) {
@@ -42,26 +49,37 @@ function genTerrain(kind, rng, defendingSide) {
     scatter(8, tree, 120, rx - 200); scatter(8, tree, rx + 200, W - 120);
   } else if (kind === 'settlement') {
     const lanes = [H * 0.32, H * 0.55, H * 0.78];
+    const hs = propSize('house');
     for (let i = 0; i < 7; i++) {
-      const hw = rng.float(60, 110), hh = rng.float(50, 80);
       const x = rng.float(W * 0.3, W * 0.68), y = rng.pick(lanes) + rng.float(-140, -60);
-      rects.push({ x, y, w: hw, h: hh, kind: 'house' });
+      rects.push({ x, y, w: hs.w * 0.86, h: hs.d * 0.8, kind: 'house', sprite: 'house' });
     }
     scatter(6, tree);
     for (let i = 0; i < 6; i++) decals.push({ x: rng.float(W * 0.25, W * 0.75), y: rng.float(150, H - 150), kind: 'fence' });
   } else if (kind === 'industrial') {
-    for (let i = 0; i < 5; i++) circles.push({ x: rng.float(W * 0.32, W * 0.68), y: rng.float(200, H - 200), r: rng.float(26, 38), kind: 'boiler' });
-    for (let i = 0; i < 4; i++) rects.push({ x: rng.float(W * 0.3, W * 0.66), y: rng.float(180, H - 240), w: rng.float(60, 90), h: rng.float(36, 50), kind: 'shed' });
-    for (let i = 0; i < 5; i++) rects.push({ x: rng.float(W * 0.28, W * 0.7), y: rng.float(160, H - 200), w: 44, h: 26, kind: 'cart' });
-    for (let i = 0; i < 8; i++) circles.push({ x: rng.float(W * 0.3, W * 0.7), y: rng.float(150, H - 150), r: rng.float(12, 20), kind: 'spoil' });
+    const bs = propSize('boiler'), ss = propSize('shed'), cs = propSize('cart');
+    for (let i = 0; i < 5; i++) {
+      circles.push({ x: rng.float(W * 0.32, W * 0.68), y: rng.float(200, H - 200), r: bs.w * 0.5, kind: 'boiler', sprite: 'boiler' });
+    }
+    for (let i = 0; i < 4; i++) {
+      rects.push({ x: rng.float(W * 0.3, W * 0.66), y: rng.float(180, H - 240), w: ss.w * 0.9, h: ss.d * 0.8, kind: 'shed', sprite: 'shed' });
+    }
+    for (let i = 0; i < 5; i++) {
+      rects.push({ x: rng.float(W * 0.28, W * 0.7), y: rng.float(160, H - 200), w: cs.w * 0.85, h: cs.d * 0.7, kind: 'cart', sprite: 'cart' });
+    }
+    for (let i = 0; i < 8; i++) {
+      circles.push({ x: rng.float(W * 0.3, W * 0.7), y: rng.float(150, H - 150), r: propSize('spoil').w * 0.42, kind: 'spoil', sprite: 'spoil' });
+    }
   } else if (kind === 'fort') {
     // Defender holds a walled position on their side with a gate gap.
     const wx = defendingSide === 'right' ? W * 0.62 : W * 0.38;
     const gateY = H / 2, gateH = 150;
-    rects.push({ x: wx - 14, y: 120, w: 28, h: gateY - gateH / 2 - 120, kind: 'wall' });
-    rects.push({ x: wx - 14, y: gateY + gateH / 2, w: 28, h: H - 120 - (gateY + gateH / 2), kind: 'wall' });
-    rects.push({ x: wx - 14, y: 80, w: 28, h: 60, kind: 'tower' });
-    rects.push({ x: wx - 14, y: H - 140, w: 28, h: 60, kind: 'tower' });
+    const ws = propSize('wall'), ts = propSize('tower');
+    const wt = ws.d * 0.9;
+    rects.push({ x: wx - wt / 2, y: 120, w: wt, h: gateY - gateH / 2 - 120, kind: 'wall' });
+    rects.push({ x: wx - wt / 2, y: gateY + gateH / 2, w: wt, h: H - 120 - (gateY + gateH / 2), kind: 'wall' });
+    rects.push({ x: wx - ts.d / 2, y: 80 - ts.d / 2, w: ts.d, h: ts.d, kind: 'tower' });
+    rects.push({ x: wx - ts.d / 2, y: H - 110 - ts.d / 2, w: ts.d, h: ts.d, kind: 'tower' });
     scatter(6, tree, 120, wx - 300);
     decals.push({ x: wx, y: gateY, kind: 'gate', w: 30, h: gateH });
   }
@@ -191,7 +209,7 @@ function makeUnit(soldier, side, x, y) {
   };
 }
 
-function deployLine(units, cx, cy, facing, spacing = 24) {
+function deployLine(units, cx, cy, facing, spacing = 28) {
   // Melee front, ranged behind, cavalry on the wings, hero at the rear-center.
   const melee = units.filter(u => !u.def.range && !u.def.cavalry && u.type !== 'hero');
   const ranged = units.filter(u => u.def.range > 0);
@@ -242,8 +260,8 @@ export function startBattle(ctx) {
 
   const pFit = fitForDuty(ctx.playerSoldiers).slice(0, 48);
   const eFit = fitForDuty(ctx.enemySoldiers).slice(0, 48);
-  const px = playerSide === 'left' ? W * 0.16 : W * 0.84;
-  const ex = enemySide === 'left' ? W * 0.16 : W * 0.84;
+  const px = playerSide === 'left' ? W * 0.2 : W * 0.8;
+  const ex = enemySide === 'left' ? W * 0.2 : W * 0.8;
   const pUnits = pFit.map(s => makeUnit(s, playerSide, px, H / 2));
   const eUnits = eFit.map(s => makeUnit(s, enemySide, ex, H / 2));
   deployLine(pUnits, px, H / 2, playerSide === 'left' ? 0 : Math.PI);
@@ -306,7 +324,7 @@ export function selectedUnits(b) {
   return b.units.filter(u => b.selection.has(u.uid) && u.state !== 'dead' && u.state !== 'fled' && u.state !== 'routing');
 }
 
-const FORM_SPACING = { line: { gap: 24, ranks: 2 }, deep: { gap: 22, ranks: 4 }, loose: { gap: 38, ranks: 2 } };
+const FORM_SPACING = { line: { gap: 28, ranks: 2 }, deep: { gap: 26, ranks: 4 }, loose: { gap: 44, ranks: 2 } };
 
 // Formation slots can land inside a wall or a boiler. Pull them onto walkable
 // ground so a move order is always something a soldier can actually finish.
@@ -432,7 +450,7 @@ function damageUnit(b, target, dmg, source, isRanged, fromX, fromY) {
     // Nearby allies flinch.
     for (const u of b.units) {
       if (u.player !== target.player || u.state === 'dead' || u.state === 'fled') continue;
-      if (dist2(u.x, u.y, target.x, target.y) < 110 * 110) u.morale -= u.type === 'hero' ? 0 : 6;
+      if (dist2(u.x, u.y, target.x, target.y) < 110 * 110) u.morale -= u.type === 'hero' ? 0 : 4;
     }
   } else {
     target.morale -= final * 0.25;
@@ -573,7 +591,7 @@ export function updateBattle(b, dt, keys) {
     // ---- morale
     if (u.type !== 'hero') {
       const lossRatio = u.player ? pLossRatio : eLossRatio;
-      if (lossRatio > 0.45) u.morale -= 1.6 * dt * (lossRatio - 0.45) * 4;
+      if (lossRatio > 0.5) u.morale -= 1.6 * dt * (lossRatio - 0.5) * 4;
       const sideAlive = u.player ? pAlive : eAlive;
       const foesAlive = u.player ? eAlive : pAlive;
       if (foesAlive > sideAlive * 2) u.morale -= 0.9 * dt;
@@ -599,7 +617,10 @@ export function updateBattle(b, dt, keys) {
       const edgeX = u.side === 'left' ? -60 : W + 60;
       desiredX = edgeX - u.x; desiredY = (H / 2 - u.y) * 0.1;
       speed *= 1.2;
-      if (u.x < -30 || u.x > W + 30) { u.state = 'fled'; continue; }
+      u.routT = (u.routT || 0) + dt;
+      // Broken troops scatter off the field; never let one snag on scenery and
+      // hold the whole battle open.
+      if (u.x < -30 || u.x > W + 30 || u.routT > 22) { u.state = 'fled'; continue; }
     } else if (u.player && heroSel && u === hero) {
       // direct WASD control
       let kx = 0, ky = 0;
@@ -667,6 +688,7 @@ export function updateBattle(b, dt, keys) {
             // keep walking to ordered position while shooting opportunistically
           } else {
             desiredX = 0; desiredY = 0;
+            u.path = null;
           }
         } else if (d <= meleeReach) {
           // melee
@@ -675,6 +697,7 @@ export function updateBattle(b, dt, keys) {
           engageTarget.engagedT = 0.6;
           u.facing = angleLerp(u.facing, Math.atan2(engageTarget.y - u.y, engageTarget.x - u.x), 0.25);
           desiredX = 0; desiredY = 0;
+          u.path = null;
           if (u.meleeCd <= 0) {
             u.meleeCd = u.def.meleeRate * (0.9 + Math.random() * 0.2);
             let dmg = u.def.meleeDmg * (u.vet ? 1.15 : 1);
@@ -721,18 +744,20 @@ export function updateBattle(b, dt, keys) {
             }
           }
         }
-        if (u.path && u.path.length > 0) {
-          let wp = u.path[u.pathIdx];
-          while (wp && dist(u.x, u.y, wp.x, wp.y) < 14) {
-            u.pathIdx++;
-            wp = u.path[u.pathIdx];
-          }
-          if (!wp) { u.path = null; }
-          else {
-            const d = dist(u.x, u.y, wp.x, wp.y) || 1;
-            desiredX = (wp.x - u.x) / d * 100;
-            desiredY = (wp.y - u.y) / d * 100;
-          }
+      }
+      // Walk whatever path we hold — including one found around a building while
+      // chasing an enemy — unless something already set a heading this frame.
+      if (u.path && u.path.length > 0 && !desiredX && !desiredY) {
+        let wp = u.path[u.pathIdx];
+        while (wp && dist(u.x, u.y, wp.x, wp.y) < 14) {
+          u.pathIdx++;
+          wp = u.path[u.pathIdx];
+        }
+        if (!wp) { u.path = null; }
+        else {
+          const d = dist(u.x, u.y, wp.x, wp.y) || 1;
+          desiredX = (wp.x - u.x) / d * 100;
+          desiredY = (wp.y - u.y) / d * 100;
         }
       }
     }
@@ -774,10 +799,24 @@ export function updateBattle(b, dt, keys) {
       }
     }
     u.vx = vx; u.vy = vy;
+    const prevX = u.x, prevY = u.y;
     let nx = u.x + (vx + sx) * dt;
     let ny = u.y + (vy + sy) * dt;
-    // obstacle rejection: don't walk into blocked cells
-    if (b.grid[cellOf(nx, ny)]) {
+    const insideWall = b.grid[cellOf(u.x, u.y)];
+    if (insideWall) {
+      // Shoved inside scenery (crowding at a gate, a wall rasterized over a
+      // spawn): walk straight back out instead of being pinned there forever.
+      const open = nearestOpen(b.grid, cellOf(u.x, u.y));
+      if (open >= 0) {
+        const ox = (open % GW) * CELL + CELL / 2, oy = Math.floor(open / GW) * CELL + CELL / 2;
+        const d = Math.hypot(ox - u.x, oy - u.y) || 1;
+        nx = u.x + (ox - u.x) / d * Math.max(speed, 40) * dt;
+        ny = u.y + (oy - u.y) / d * Math.max(speed, 40) * dt;
+        u.path = null;
+      }
+    } else if (u.state !== 'routing' && b.grid[cellOf(nx, ny)]) {
+      // obstacle rejection: slide along the blockage (routers push through —
+      // they are leaving the field, not navigating it)
       if (!b.grid[cellOf(nx, u.y)]) { ny = u.y; }
       else if (!b.grid[cellOf(u.x, ny)]) { nx = u.x; }
       else { nx = u.x; ny = u.y; u.path = null; }
@@ -785,6 +824,16 @@ export function updateBattle(b, dt, keys) {
     u.x = clamp(nx, u.state === 'routing' ? -80 : 12, u.state === 'routing' ? W + 80 : W - 12);
     u.y = clamp(ny, 12, H - 12);
     if (moving && u.state === 'moving') u.facing = angleLerp(u.facing, Math.atan2(vy, vx), 0.18);
+
+    // Watchdog: a soldier trying to move but going nowhere for half a minute
+    // has lost the battle in every sense — treat them as slipping off the field
+    // rather than letting one wedged unit hold the engagement open forever.
+    if (moving && Math.hypot(u.x - prevX, u.y - prevY) < 0.4) {
+      u.stuckT = (u.stuckT || 0) + dt;
+      if (u.stuckT > 30) { u.state = 'fled'; b.selection.delete(u.uid); }
+    } else {
+      u.stuckT = 0;
+    }
   }
 
   // ---- projectiles

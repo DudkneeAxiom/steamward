@@ -55,17 +55,24 @@ test('pressure bolts pierce armor; ordinary arrows do not', async ({ page }) => 
   await openBattle(page);
   const dmg = await page.evaluate(async () => {
     const b = window.SW.battle;
+    // Clear the field to one shooter and one target so nobody else's arrows
+    // land in the measurement.
+    const shooter0 = b.units.find(u => u.player && u.def.range > 0);
+    const target0 = b.units.find(u => !u.player);
+    b.units = [shooter0, target0];
+    b.aiT = 1e9;                       // no enemy orders during the test
     // Armored, shieldless target that soaks hits without dying.
     const setupTarget = () => {
-      const foe = b.units.find(u => !u.player && u.state !== 'dead');
-      foe.def = { ...foe.def, armor: 3, shieldBlock: 0 };
+      const foe = target0;
+      foe.def = { ...foe.def, armor: 3, shieldBlock: 0, speed: 0 };
       foe.hp = 100000; foe.maxHp = 100000;
-      foe.orderPos = null; foe.orderTargetUid = null; foe.path = null;
+      foe.state = 'idle';
+      foe.orderPos = null; foe.orderTargetUid = null; foe.autoTarget = null; foe.path = null;
       return foe;
     };
     const measure = (shooterType) => new Promise(resolve => {
       const foe = setupTarget();
-      const shooter = b.units.find(u => u.player && u.def.range > 0);
+      const shooter = shooter0;
       shooter.type = shooterType;
       shooter.def = window.SW.UNIT_TYPES[shooterType];
       shooter.cooldown = 0;

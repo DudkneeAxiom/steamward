@@ -55,6 +55,23 @@ export function setScreen(screen, hasSaveFile) {
   ctxSig = ''; hudSig = '';
 }
 
+// The menu buttons stay disabled until the sprite atlases are in memory.
+export function setBooting(booting) {
+  for (const id of ['btn-new', 'btn-continue']) {
+    const el = $(id);
+    if (el) el.disabled = booting;
+  }
+  const hint = document.querySelector('.menuhint');
+  if (hint) {
+    if (booting) {
+      hint.dataset.text = hint.dataset.text || hint.textContent;
+      hint.textContent = 'Casting the company…';
+    } else if (hint.dataset.text) {
+      hint.textContent = hint.dataset.text;
+    }
+  }
+}
+
 export function setSpeedButtons(speed) {
   $('btn-pause').classList.toggle('active', speed === 0);
   $('btn-play').classList.toggle('active', speed === 1);
@@ -168,7 +185,8 @@ export function updateContextPanel(c, selectedArmy, nearbyLoc) {
     const g = fitForDuty(nearbyLoc.garrison).length;
     html += `<div class="row"><span class="k">Garrison</span><span>${g} / ${lt.garrisonCap}</span></div>`;
 
-    const friendly = nearbyLoc.owner === 'player' || nearbyLoc.owner === 'neutral';
+    // An independent site with its watch still standing won't muster for you.
+    const friendly = nearbyLoc.owner === 'player' || (nearbyLoc.owner === 'neutral' && g === 0);
     if (friendly && lt.recruits.length > 0) {
       html += `<div class="row k" style="margin-top:6px">Recruit</div>`;
       for (const t of lt.recruits) {
@@ -183,8 +201,8 @@ export function updateContextPanel(c, selectedArmy, nearbyLoc) {
       if (nearbyLoc.garrison.length > 0) html += `<button data-act="gtake" data-n="3">TAKE 3</button>`;
       if (lt.heals) html += `<button data-act="heal">TREAT WOUNDED (5c each)</button>`;
     }
-    if (nearbyLoc.owner !== 'player' && nearbyLoc.owner !== 'neutral' && g > 0) {
-      html += `<div class="hint">Enemy garrison holds this place — move onto it to assault.</div>`;
+    if (nearbyLoc.owner !== 'player' && g > 0) {
+      html += `<div class="hint">${g} defender${g === 1 ? '' : 's'} hold this place — move onto it to assault.</div>`;
     } else if (nearbyLoc.owner !== 'player' && g === 0) {
       html += `<div class="hint">Hold position here to take control.</div>`;
     }

@@ -1,5 +1,5 @@
 node_modules/
 test-results/
 playwright-report/
-*.png
-!docs/*.png
+# generated sprite atlases are committed on purpose
+.bpyenv/

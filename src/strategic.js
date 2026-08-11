@@ -151,7 +151,8 @@ function tryCapture(c, army, events, rng) {
     if (loc.owner === army.faction) continue;
 
     const defenders = fitForDuty(loc.garrison);
-    if (defenders.length > 0 && hostile(army.faction, loc.owner)) {
+    // Any garrison defends its ground — independent sites keep their own watch.
+    if (defenders.length > 0) {
       // Garrison stands: fight for the location.
       if (army.faction === 'player') {
         // Player attacks a garrisoned location — main.js turns this into a battle choice.
