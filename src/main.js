@@ -1,7 +1,7 @@
 // STEAMWARD entry point: game loop, input routing, mode transitions, and the
 // glue that carries soldiers between the strategic and tactical layers.
 
-import { TUNE, FACTIONS, LOC_TYPES } from './data.js';
+import { TUNE, FACTIONS, LOC_TYPES, UNIT_TYPES } from './data.js';
 import { makeRng, dist, clamp } from './util.js';
 import * as Campaign from './campaign.js';
 import * as Strategic from './strategic.js';
@@ -66,8 +66,12 @@ const api = {
     UI.setScreen('menu', false);
   },
   toMenu() {
+    if (mode === 'battle' &&
+        !confirm('Leave the battle? This engagement is abandoned and the campaign reloads from its last save.')) return;
     if (campaign && mode === 'strategic') Campaign.saveCampaign(campaign);
+    if (mode === 'battle') { battle = null; battleMeta = null; }
     mode = 'menu';
+    UI.closeDialog();
     UI.setScreen('menu', Campaign.hasSave());
   },
   setSpeed(s) {
@@ -159,6 +163,14 @@ function buildEncounterContext(enemyArmy, loc, defending) {
 
 function onStrategicEvents(events) {
   for (const ev of events) {
+    // One dialog at a time: a second openDialog() would overwrite the first and
+    // strand pendingEncounter, freezing the simulation for good.
+    if (ev.type === 'encounter' || ev.type === 'assault' || ev.type === 'defense') {
+      if (UI.isDialogOpen()) {
+        campaign.pendingEncounter = false; // let it re-trigger once the player is free
+        continue;
+      }
+    }
     if (ev.type === 'encounter') {
       const bctx = buildEncounterContext(ev.enemy, null, false);
       UI.showEncounter({
@@ -186,9 +198,17 @@ function onStrategicEvents(events) {
         onAuto: () => autoResolveEncounter(null, ev.loc, false),
         onRetreat: () => {
           const pa = Campaign.playerArmy(campaign);
-          const dx = pa.x - ev.loc.x, dy = pa.y - ev.loc.y;
-          const d = Math.hypot(dx, dy) || 1;
-          pa.x += dx / d * 90; pa.y += dy / d * 90;
+          let dx = pa.x - ev.loc.x, dy = pa.y - ev.loc.y;
+          let d = Math.hypot(dx, dy);
+          if (d < 1) {
+            // Standing dead-center on the location (move orders snap to it):
+            // fall back toward camp instead of nowhere.
+            const camp = Campaign.byKey(campaign, 'camp');
+            dx = camp.x - pa.x; dy = camp.y - pa.y;
+            d = Math.hypot(dx, dy) || 1;
+          }
+          pa.x = clamp(pa.x + dx / d * 90, 20, Campaign.WORLD.w - 20);
+          pa.y = clamp(pa.y + dy / d * 90, 20, Campaign.WORLD.h - 20);
           pa.dest = null;
           campaign.pendingEncounter = false;
         },
@@ -207,14 +227,9 @@ function onStrategicEvents(events) {
       });
     } else if (ev.type === 'captured') {
       Campaign.saveCampaign(campaign);
-    } else if (ev.type === 'victory') {
-      if (!campaign.victoryShown) {
-        campaign.victoryShown = true;
-        sfx('victory');
-        UI.showVictoryDialog(campaign);
-        Campaign.saveCampaign(campaign);
-      }
     }
+    // Victory is announced from the frame loop instead of here, so it can wait
+    // for any encounter dialog already on screen.
   }
 }
 
@@ -374,6 +389,7 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 1) { mouse.mmb = true; e.preventDefault(); return; }
   if (e.button === 0) {
     mouse.down = true; mouse.downX = m.x; mouse.downY = m.y; mouse.dragging = false;
+    mouse.pressOnCanvas = true;
   }
 });
 
@@ -393,7 +409,10 @@ window.addEventListener('mouseup', (e) => {
   if (e.button === 1) { mouse.mmb = false; return; }
   if (e.button !== 0) return;
   const wasDragging = mouse.dragging;
-  mouse.down = false; mouse.dragging = false;
+  const onCanvas = mouse.pressOnCanvas;
+  mouse.down = false; mouse.dragging = false; mouse.pressOnCanvas = false;
+  // A click that began on a HUD button is that button's business, not an order.
+  if (!onCanvas) { boxSel = null; return; }
   if (UI.isDialogOpen()) { boxSel = null; return; }
 
   if (mode === 'strategic') {
@@ -452,6 +471,14 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
     }
   }
+});
+
+// Losing focus with a key held would otherwise leave it stuck down forever.
+window.addEventListener('blur', () => {
+  for (const k of Object.keys(keys)) keys[k] = false;
+  attackArmed = false;
+  mouse.down = false; mouse.dragging = false; mouse.mmb = false; mouse.pressOnCanvas = false;
+  boxSel = null;
 });
 
 window.addEventListener('keyup', (e) => {
@@ -549,9 +576,10 @@ function updateCamera(dt) {
   if (keys['arrowright']) dx += pan;
   if (keys['arrowup']) dy -= pan;
   if (keys['arrowdown']) dy += pan;
-  // WASD pans unless the commander is under direct control
+  // WASD pans unless the commander is under direct control. In battle, `A` is
+  // the attack-move modifier, so it never doubles as a camera key there.
   if (!(mode === 'battle' && heroSolo())) {
-    if (keys['a']) dx -= pan;
+    if (keys['a'] && mode !== 'battle') dx -= pan;
     if (keys['d']) dx += pan;
     if (keys['w']) dy -= pan;
     if (keys['s']) dy += pan;
@@ -585,6 +613,12 @@ function frame(now) {
       onStrategicEvents(events);
       autosaveT += simDt;
       if (autosaveT > 30) { autosaveT = 0; Campaign.saveCampaign(campaign); }
+    }
+    if (campaign.victory && !campaign.victoryShown && !UI.isDialogOpen()) {
+      campaign.victoryShown = true;
+      sfx('victory');
+      UI.showVictoryDialog(campaign);
+      Campaign.saveCampaign(campaign);
     }
     const pa = Campaign.playerArmy(campaign);
     selectedArmy = pa;
@@ -651,7 +685,7 @@ window.SW = {
   get cam() { return cam; },
   get dpr() { return dpr; },
   api,
-  Campaign, Battle, Strategic, UI,
+  Campaign, Battle, Strategic, UI, UNIT_TYPES,
   giveResources(crowns = 200, provisions = 50, coal = 50) {
     campaign.resources.crowns += crowns;
     campaign.resources.provisions += provisions;

@@ -311,8 +311,10 @@ function drawRect(ctx, cam, r, time) {
     }
   } else if (r.kind === 'house' || r.kind === 'shed') {
     const h = (r.kind === 'house' ? 34 : 26) * z;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(a.x - 2, b.y - 4, b.x - a.x + 4, 8);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse((a.x + b.x) / 2, b.y, (b.x - a.x) * 0.62, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = r.kind === 'house' ? '#7a6448' : '#5d5344';
     ctx.fillRect(a.x, a.y - h, b.x - a.x, (b.y - a.y) + h);
     ctx.fillStyle = r.kind === 'house' ? '#8a5238' : '#4c4a48';
@@ -322,13 +324,25 @@ function drawRect(ctx, cam, r, time) {
     ctx.lineTo(b.x + 3 * z, a.y - h);
     ctx.closePath(); ctx.fill();
   } else if (r.kind === 'wall' || r.kind === 'tower') {
-    const h = (r.kind === 'tower' ? 42 : 30) * z;
-    ctx.fillStyle = '#5d5a52';
-    ctx.fillRect(a.x, a.y - h, b.x - a.x, (b.y - a.y) + h);
-    ctx.fillStyle = '#767268';
-    ctx.fillRect(a.x, a.y - h, b.x - a.x, 6 * z);
-    ctx.fillStyle = '#4c4a48';
-    for (let y = a.y - h + 10 * z; y < b.y; y += 14 * z) ctx.fillRect(a.x, y, b.x - a.x, 1.4);
+    const h = (r.kind === 'tower' ? 44 : 32) * z;
+    const w = b.x - a.x;
+    // stone curtain wall: solid band with lit/shadow edges, buttresses, merlons
+    ctx.fillStyle = '#54514a';
+    ctx.fillRect(a.x, a.y - h, w, (b.y - a.y) + h);
+    ctx.fillStyle = '#6b675f';
+    ctx.fillRect(a.x, a.y - h, Math.max(3, w * 0.3), (b.y - a.y) + h);
+    ctx.fillStyle = '#3c3a35';
+    ctx.fillRect(b.x - Math.max(2, w * 0.18), a.y - h, Math.max(2, w * 0.18), (b.y - a.y) + h);
+    // buttress blocks give the wall rhythm without reading as rungs
+    ctx.fillStyle = '#615d55';
+    for (let y = a.y - h + 30 * z; y < b.y - 20 * z; y += 105 * z) {
+      ctx.fillRect(a.x - 4 * z, y, w + 8 * z, 16 * z);
+    }
+    // merlons along the parapet line
+    ctx.fillStyle = '#7d786e';
+    for (let y = a.y - h + 6 * z; y < b.y - 4; y += 24 * z) {
+      ctx.fillRect(a.x + w * 0.3, y, w * 0.4, 6 * z);
+    }
   } else if (r.kind === 'cart') {
     ctx.fillStyle = '#4a3826';
     ctx.fillRect(a.x, a.y - 10 * z, b.x - a.x, (b.y - a.y) + 10 * z);

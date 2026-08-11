@@ -27,7 +27,9 @@ export function initUI(gameApi) {
   $('btn-form-deep').onclick = () => api.setFormation('deep');
   $('btn-form-loose').onclick = () => api.setFormation('loose');
   $('btn-hero').onclick = () => api.selectHero();
-  $('btn-withdraw').onclick = () => api.withdraw();
+  $('btn-withdraw').onclick = () => {
+    if (confirm('Order a withdrawal? Your soldiers will break off and quit the field.')) api.withdraw();
+  };
   // Rally button lives next to the fixed ones.
   const rallyBtn = document.createElement('button');
   rallyBtn.className = 'fbtn';
@@ -42,6 +44,8 @@ export function setScreen(screen, hasSaveFile) {
   $('mainmenu').classList.toggle('hidden', screen !== 'menu');
   $('topbar').classList.toggle('hidden', screen === 'menu');
   $('battle-hud').classList.toggle('hidden', screen !== 'battle');
+  // Campaign clock controls have no meaning inside a battle — don't show dead buttons.
+  $('time-controls').classList.toggle('hidden', screen !== 'strategic');
   if (screen !== 'strategic') $('context-panel').classList.add('hidden');
   if (screen === 'menu') {
     $('btn-continue').classList.toggle('hidden', !hasSaveFile);

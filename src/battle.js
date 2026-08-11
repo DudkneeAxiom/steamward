@@ -308,6 +308,16 @@ export function selectedUnits(b) {
 
 const FORM_SPACING = { line: { gap: 24, ranks: 2 }, deep: { gap: 22, ranks: 4 }, loose: { gap: 38, ranks: 2 } };
 
+// Formation slots can land inside a wall or a boiler. Pull them onto walkable
+// ground so a move order is always something a soldier can actually finish.
+function snapOpen(b, x, y) {
+  const c = cellOf(x, y);
+  if (!b.grid[c]) return { x, y };
+  const open = nearestOpen(b.grid, c);
+  if (open < 0) return { x, y };
+  return { x: (open % GW) * CELL + CELL / 2, y: Math.floor(open / GW) * CELL + CELL / 2 };
+}
+
 export function commandMove(b, x, y, attackMove = false) {
   const sel = selectedUnits(b);
   if (sel.length === 0) return false;
@@ -329,9 +339,9 @@ export function commandMove(b, x, y, attackMove = false) {
     const rowN = Math.min(perRow, n - row * perRow);
     const off = (col - (rowN - 1) / 2) * form.gap;
     const back = row * form.gap;
-    let tx = clamp(x + px * off - Math.cos(ang) * back, 20, W - 20);
-    let ty = clamp(y + py * off - Math.sin(ang) * back, 20, H - 20);
-    u.orderPos = { x: tx, y: ty };
+    const tx = clamp(x + px * off - Math.cos(ang) * back, 20, W - 20);
+    const ty = clamp(y + py * off - Math.sin(ang) * back, 20, H - 20);
+    u.orderPos = snapOpen(b, tx, ty);
     u.orderTargetUid = null;
     u.attackMove = attackMove;
     u.path = null; u.pathIdx = 0;
@@ -372,6 +382,9 @@ export function rally(b) {
   const hero = heroUnit(b);
   if (!hero || hero.state === 'dead' || b.rallyCd > 0) return false;
   b.rallyCd = 40;
+  // A rally that puts troops back in the fight also calls off a withdrawal —
+  // otherwise the battle would still resolve as a forfeit.
+  b.withdrawing = false;
   for (const u of aliveUnits(b, true)) {
     if (dist(u.x, u.y, hero.x, hero.y) < 230) {
       u.morale = Math.min(u.moraleMax, u.morale + 30);
@@ -402,8 +415,11 @@ function damageUnit(b, target, dmg, source, isRanged, fromX, fromY) {
     // arrow's travel direction vs facing: blocked if it comes at the face
     if (Math.abs(rel) > Math.PI / 2) final *= (1 - target.def.shieldBlock);
   }
-  const armor = target.def.armor * (isRanged ? 3 : 2);
-  if (!(isRanged && source && source.pierce)) final = Math.max(1, final - armor);
+  // multiplicative armor keeps cheap troops relevant against heavy ones;
+  // pressure-driven bolts (def.pierce) punch straight through it
+  const armorFac = 1 - Math.min(0.6, target.def.armor * (isRanged ? 0.16 : 0.12));
+  if (!(isRanged && source && source.def && source.def.pierce)) final *= armorFac;
+  final = Math.max(1, final);
   target.hp -= final;
   b.effects.push({ type: 'hit', x: target.x, y: target.y, ranged: isRanged });
   if (target.hp <= 0) {
@@ -608,11 +624,15 @@ export function updateBattle(b, dt, keys) {
         }
       }
 
-      // autonomous target acquisition (attack-move, idling, or ranged units in reach)
+      // A unit with no standing orders defends itself: it acquires and engages
+      // nearby enemies on its own, whatever animation state it happens to be in.
+      const unordered = !u.orderPos && !u.orderTargetUid;
+
+      // autonomous target acquisition (attack-move, unordered troops, or ranged units in reach)
       u.thinkT -= dt;
       if (!target && u.thinkT <= 0) {
         u.thinkT = 0.3 + Math.random() * 0.25;
-        const aggro = u.type === 'hero' ? 80 : u.def.range > 0 ? u.def.range : (u.attackMove || u.state === 'idle' ? 190 : 60);
+        const aggro = u.type === 'hero' ? 110 : u.def.range > 0 ? u.def.range : (u.attackMove || unordered ? 190 : 60);
         let best = null, bd = aggro * aggro;
         for (const v of neighbors(u.x, u.y)) {
           if (v.player === u.player || v.state === 'dead' || v.state === 'fled') continue;
@@ -628,7 +648,7 @@ export function updateBattle(b, dt, keys) {
             if (d < bd) { bd = d; best = v; }
           }
         }
-        if (best && (u.state === 'idle' || u.attackMove || u.def.range > 0)) u.autoTarget = best.uid;
+        if (best && (unordered || u.attackMove || u.def.range > 0)) u.autoTarget = best.uid;
         else u.autoTarget = null;
       }
       const auto = u.autoTarget ? b.units.find(v => v.uid === u.autoTarget && v.state !== 'dead' && v.state !== 'fled') : null;
@@ -669,7 +689,7 @@ export function updateBattle(b, dt, keys) {
             damageUnit(b, engageTarget, dmg, u, false, u.x, u.y);
             b.effects.push({ type: 'melee', x: (u.x + engageTarget.x) / 2, y: (u.y + engageTarget.y) / 2 });
           }
-        } else if (target || u.attackMove || (u.state === 'idle' && d < 220 && !u.def.range)) {
+        } else if (target || u.attackMove || (unordered && d < 220 && !u.def.range)) {
           // close the distance
           const gd = Math.hypot(engageTarget.x - u.x, engageTarget.y - u.y);
           u.repathT -= dt;
@@ -727,6 +747,10 @@ export function updateBattle(b, dt, keys) {
         u.chargeT = 0;
       }
     }
+
+    // Nothing left to do and standing still: drop back to idle so the unit can
+    // pick up new work next tick instead of being stranded in a stale state.
+    if (!moving && u.state === 'moving' && !u.orderPos && !u.path) u.state = 'idle';
 
     // ---- integrate movement with separation
     let vx = 0, vy = 0;
@@ -804,14 +828,16 @@ export function updateBattle(b, dt, keys) {
 
 function finishBattle(b, pLeft, eLeft) {
   b.state = 'ended';
-  const victory = eLeft === 0 && pLeft > 0 && !b.withdrawing;
+  // Holding the field is a victory however the battle got there — a withdrawal
+  // that turned into a rout of the enemy still won the ground.
+  const victory = eLeft === 0 && pLeft > 0;
   const playerFallen = new Set(), enemyFallen = new Set();
   for (const u of b.units) {
     if (u.state === 'dead') (u.player ? playerFallen : enemyFallen).add(u.soldier.id);
   }
   b.result = {
     victory,
-    withdrew: !!b.withdrawing,
+    withdrew: !!b.withdrawing && !victory,
     playerFallen, enemyFallen,
     duration: b.time,
     playerSurvivors: b.units.filter(u => u.player && u.state !== 'dead').map(u => u.soldier),
