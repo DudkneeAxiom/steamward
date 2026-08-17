@@ -1456,6 +1456,12 @@ def preview_fort(path, px=1000, angle=27.0, azimuth=26.0):
     put(rubble_pile, 40.0, 60.0)
     put(broken_cart, 5.0, 80.0)
 
+    # Centre the fort under the camera, then scale it down: preview_render's
+    # orthographic camera stands back three times the subject's span, and a
+    # fort this wide would push it past the camera's default far clip and
+    # render nothing at all. Ortho, so shrinking changes only the clip maths.
     lo, hi = extents(master)
-    master.location = (-(lo[0] + hi[0]) / 2.0, -(lo[1] + hi[1]) / 2.0, 0)
+    k = 250.0 / max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], 1.0)
+    master.scale = (k, k, k)
+    master.location = (-(lo[0] + hi[0]) / 2.0 * k, -(lo[1] + hi[1]) / 2.0 * k, 0)
     preview_render(master, path, px=px, angle=angle, azimuth=azimuth, margin=1.04)
